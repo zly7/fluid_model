@@ -1,0 +1,105 @@
+{
+	"mcpServers": {
+		"context7": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx",
+				"-y",
+				"@upstash/context7-mcp@latest"
+			]
+		},
+		"sequential-thinking": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx",
+				"-y",
+				"@modelcontextprotocol/server-sequential-thinking"
+			]
+		},
+		"mcp-feedback-enhanced": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"mcp-feedback-enhanced@latest"
+			],
+			"timeout": 600,
+			"autoApprove": [
+				"interactive_feedback"
+			]
+		},
+		"playwright": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx",
+				"@playwright/mcp@latest"
+			]
+		},
+		"mcp-server-time": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"mcp-server-time",
+				"--local-timezone=Asia/Singapore"
+			]
+		},
+		"mcp-deepwiki": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx",
+				"-y",
+				"mcp-deepwiki@latest"
+			]
+		},
+		"mcp-server-firecrawl": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx",
+				"-y",
+				"firecrawl-mcp"
+			],
+			"env": {
+				"FIRECRAWL_API_KEY": "fc-f83efd204f684fa898c878c66fb5df7e"
+			}
+		},
+		"task-master-ai": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx",
+				"-y",
+				"--package=task-master-ai",
+				"task-master-ai"
+			]
+		},
+		"mcp-damengsql": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"D:/testwlhtea/.venv/Scripts/python.exe",
+				"D:/testwlhtea/run_mcp_server.py"
+			]
+		},
+		"desktop-commander": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"npx",
+				"-y",
+				"@wonderwhy-er/desktop-commander"
+			]
+		}
+	}
+}
