@@ -1,6 +1,6 @@
 # 当前状态
 现在你已经把数据准备和好了，你可以@data里面里面查看dataloader的数据结构，现在你需要设计模型。
-
+你需要@data 里面的代码进行查看dataloader是什么，以及target是什么，以及一些背景。
 # 模型
 ## Decoder 架构
 输入的[B, T, V]需要先转化成[B,T*V,dim],这个dim就是类似于768这种模型，应该是通过预设的一些config传入的，预设的参数分成模型config，和训练还有测试的config，你分别先创建对应的模型config typedict类再在模型里面解析。训练的一些参数先不管，这是后面的事情。
@@ -13,3 +13,16 @@
 5.使用multihead self attention
 6.其它正常的decoder结构，比如残差连接，norm层
 7.输入数据都是浮点数，先归一化然后线性映射，可以使用更小 MLP（如 1→128→256，GELU+LayerNorm），对非线性关系更友好。
+
+## 已完成
+1.不要引入checkpoint增加代码复杂度
+2.输入输出投影一定会有，不要增加复杂度
+3.# Input projection
+        x = self.input_projection(x)  # [B, T, d_model] 这里 应该是[B, T*V, d_model]
+因为我不想变量混淆，T一般长度比较短，就是T=3，你可以增加这个默认
+4.不要引入causal mask 增加复杂度
+5.positional encoding 分成时间维度的，T的值是1-10，所以可以使用固定的正弦–余弦位置编码，V的值也是固定的正弦余弦，但是可以是学习的编码，或者你思考下用什么编码比较好。最后是一个d-model既要有加上时间的编码，也要加上原本6712的变量表征编码。
+
+
+## 现在你已经完成了上面的任务
+帮我删除所有transformer相关的结构，因为已经是用decoder了。并且在这里models写测试文件，就是验证输入输出的维度
