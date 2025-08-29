@@ -1,5 +1,9 @@
 # Data files
-/data
+/data/*
+!data/*.py
+!data/**/*.py
+!data/*.md
+!data/**/*.md
 *.csv
 *.xlsx
 *.xls
