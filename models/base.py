@@ -43,63 +43,49 @@ class BaseModel(nn.Module, ABC):
         self.model_config = kwargs
         
     @abstractmethod
-    def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(self, input_ids=None, labels=None, **kwargs):
         """
-        Forward pass of the model.
+        Forward pass compatible with transformers library.
         
         Args:
-            batch: Dictionary containing:
-                - 'input': Input tensor [B, T, V=6712]
-                - 'attention_mask': Attention mask [B, T, V] (optional)
-                - 'prediction_mask': Prediction mask [B, V] (for loss computation)
+            input_ids: Input tensor [B, T, V=6712] or Dict containing inputs
+            labels: Target tensor [B, T, V=6712] for loss computation (optional)
+            **kwargs: Additional arguments
                 
         Returns:
-            predictions: Output tensor [B, T, V=6712]
+            If labels provided: Dict with 'loss' and 'logits'
+            Else: predictions tensor [B, T, V=6712] or Dict with 'logits'
         """
         pass
     
-    def compute_loss(self, batch: Dict[str, torch.Tensor], predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def compute_loss(self, predictions: torch.Tensor, labels: torch.Tensor, prediction_mask: torch.Tensor = None) -> torch.Tensor:
         """
-        Compute loss with prediction masking.
+        Compute MSE loss compatible with transformers.
         
         Args:
-            batch: Input batch with 'target' and 'prediction_mask'
             predictions: Model predictions [B, T, V]
+            labels: Target tensor [B, T, V]
+            prediction_mask: Prediction mask [B, V] (optional)
             
         Returns:
-            Dictionary with loss components
+            MSE loss tensor (scalar)
         """
-        targets = batch['target']  # [B, T, V]
-        prediction_mask = batch['prediction_mask']  # [B, V]
-        
-        # Expand prediction mask to match time dimension
-        mask = prediction_mask.unsqueeze(1)  # [B, 1, V]
-        mask = mask.expand(-1, targets.size(1), -1)  # [B, T, V]
-        
-        # Compute MSE loss only for predicted variables (mask=1)
-        mse_loss = F.mse_loss(predictions, targets, reduction='none')  # [B, T, V]
-        masked_loss = mse_loss * mask.float()
-        
-        # Average over masked positions
-        total_loss = masked_loss.sum() / mask.float().sum().clamp(min=1e-8)
-        
-        # Additional metrics
-        with torch.no_grad():
-            # Equipment-only loss (excluding boundary conditions)
-            equipment_mask = mask[:, :, self.boundary_dims:]  # [B, T, equipment_dims]
-            equipment_loss = (masked_loss[:, :, self.boundary_dims:] * equipment_mask.float()).sum() / equipment_mask.float().sum().clamp(min=1e-8)
+        if prediction_mask is not None:
+            # Expand prediction mask to match time dimension
+            mask = prediction_mask.unsqueeze(1)  # [B, 1, V]
+            mask = mask.expand(-1, labels.size(1), -1)  # [B, T, V]
             
-            # MAE for interpretability
-            mae_loss = F.l1_loss(predictions, targets, reduction='none')
-            masked_mae = mae_loss * mask.float()
-            total_mae = masked_mae.sum() / mask.float().sum().clamp(min=1e-8)
+            # Compute MSE loss only for predicted variables (mask=1)
+            mse_loss = F.mse_loss(predictions, labels, reduction='none')  # [B, T, V]
+            masked_loss = mse_loss * mask.float()
+            
+            # Average over masked positions
+            total_loss = masked_loss.sum() / mask.float().sum().clamp(min=1e-8)
+        else:
+            # Simple MSE loss without masking
+            total_loss = F.mse_loss(predictions, labels)
         
-        return {
-            'loss': total_loss,
-            'mse_loss': total_loss,
-            'equipment_loss': equipment_loss,
-            'mae_loss': total_mae
-        }
+        return total_loss
     
     def predict(self, batch: Dict[str, torch.Tensor], **kwargs) -> torch.Tensor:
         """

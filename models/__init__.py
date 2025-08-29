@@ -13,7 +13,6 @@ from .decoder import FluidDecoder
 from .config import (
     ModelConfig,
     DecoderConfig,
-    AttentionConfig,
     create_default_configs,
     load_config_from_file,
     save_config_to_file
@@ -32,7 +31,6 @@ __all__ = [
     'FluidDecoder',
     'ModelConfig',
     'DecoderConfig',
-    'AttentionConfig',
     'create_default_configs',
     'load_config_from_file',
     'save_config_to_file',

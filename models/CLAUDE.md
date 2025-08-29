@@ -24,5 +24,8 @@
 5.positional encoding 分成时间维度的，T的值是1-10，所以可以使用固定的正弦–余弦位置编码，V的值也是固定的正弦余弦，但是可以是学习的编码，或者你思考下用什么编码比较好。最后是一个d-model既要有加上时间的编码，也要加上原本6712的变量表征编码。
 
 
-## 现在你已经完成了上面的任务
+## 已完成
 帮我删除所有transformer相关的结构，因为已经是用decoder了。并且在这里models写测试文件，就是验证输入输出的维度
+
+## 已完成
+现在你需要把整个模型完全兼容transformers仓库的Trainer和TrainingArguments，也就是意味着你需要返回loss，并且forward也需要兼容transformers仓库的要求的格式。LOSS用MSELoss】

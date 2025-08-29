@@ -347,20 +347,32 @@ class FluidDecoder(BaseModel):
                 nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
     
-    def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(self, input_ids=None, labels=None, prediction_mask=None, **kwargs):
         """
-        FluidDecoder前向传播。
+        FluidDecoder前向传播，兼容transformers格式。
         
         Args:
-            batch: 字典，包含：
-                - 'input': 输入张量 [B, T, V=6712]
-                - 'attention_mask': 注意力mask [B, T, V] (可选)
-                - 'prediction_mask': 预测mask [B, V]
+            input_ids: 输入张量 [B, T, V=6712] 或包含'input'键的字典
+            labels: 目标张量 [B, T, V=6712] 用于损失计算 (可选)
+            prediction_mask: 预测mask [B, V] (可选)
+            **kwargs: 额外参数
         
         Returns:
-            predictions: 输出张量 [B, T, V=6712]
+            如果提供labels: {'loss': tensor, 'logits': tensor}
+            否则: {'logits': tensor} 或 tensor
         """
-        x = batch['input']  # [B, T, V]
+        # 处理输入格式兼容性
+        if isinstance(input_ids, dict):
+            # 兼容原有的batch格式
+            batch = input_ids
+            x = batch['input']  # [B, T, V]
+            if labels is None and 'target' in batch:
+                labels = batch['target']
+            if prediction_mask is None and 'prediction_mask' in batch:
+                prediction_mask = batch['prediction_mask']
+        else:
+            x = input_ids  # [B, T, V]
+        
         batch_size, time_steps, num_variables = x.shape
         
         # 重塑输入：[B, T, V] -> [B, T*V, 1] 
@@ -394,7 +406,14 @@ class FluidDecoder(BaseModel):
         # 重塑回原始维度：[B, T*V, 1] -> [B, T, V]
         predictions = predictions.squeeze(-1).view(batch_size, time_steps, num_variables)
         
-        return predictions
+        # 返回格式兼容transformers
+        if labels is not None:
+            # 计算loss
+            loss = self.compute_loss(predictions, labels, prediction_mask)
+            return {'loss': loss, 'logits': predictions}
+        else:
+            # 只返回预测结果
+            return {'logits': predictions}
     
     def get_model_info(self) -> Dict:
         """获取详细的模型信息。"""

@@ -86,18 +86,6 @@ class DecoderConfig(ModelConfig):
             raise ValueError(f"d_model ({self.d_model}) must be divisible by n_heads ({self.n_heads})")
 
 
-@dataclass
-class AttentionConfig:
-    """Configuration for attention mechanisms."""
-    
-    attention_type: str = "scaled_dot_product"  # or "sparse", "factorized"
-    sparse_attention_pattern: Optional[str] = None
-    local_window_size: int = 64
-    global_tokens: int = 16
-    
-    # For sparse/structured attention
-    use_structured_attention: bool = False
-    topology_aware: bool = False
     
     
 def create_default_configs() -> Dict[str, ModelConfig]:
