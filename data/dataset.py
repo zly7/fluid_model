@@ -11,6 +11,7 @@ import warnings
 from tensordict import TensorDict
 
 from .processor import DataProcessor
+from .normalizer import DataNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,6 @@ class FluidDataset(Dataset):
                  data_dir: str,
                  split: str = 'train',
                  sequence_length: int = 3,
-                 normalize: bool = True,
-                 scaler_type: str = 'standard',
                  cache_data: bool = True,
                  max_samples: Optional[int] = None,
                  max_sequences_per_sample: Optional[int] = None):
@@ -46,8 +45,6 @@ class FluidDataset(Dataset):
             data_dir: Path to data directory
             split: 'train', 'val', or 'test'
             sequence_length: Length of time series sequences (default: 3 for 3 minutes)
-            normalize: Whether to normalize the data
-            scaler_type: 'standard' or 'minmax' normalization
             cache_data: Whether to cache loaded data in memory
             max_samples: Maximum number of samples to load (for testing)
             max_sequences_per_sample: Maximum sequences per sample (for memory control)
@@ -55,8 +52,6 @@ class FluidDataset(Dataset):
         self.data_dir = Path(data_dir)
         self.split = split
         self.sequence_length = sequence_length
-        self.normalize = normalize
-        self.scaler_type = scaler_type
         self.cache_data = cache_data
         self.max_samples = max_samples
         self.max_sequences_per_sample = max_sequences_per_sample
@@ -66,9 +61,6 @@ class FluidDataset(Dataset):
         
         # Data dimensions
         self.total_dims = 6712  # 538 boundary + 6174 equipment
-        
-        # Initialize scalers
-        self.scaler = None
         
         # Cache for loaded data
         self.data_cache = {} if cache_data else None
@@ -105,10 +97,6 @@ class FluidDataset(Dataset):
         
         # Load all sequences from all samples
         self._load_all_sequences()
-        
-        # Fit scaler on training data
-        if self.normalize and self.split == 'train':
-            self._fit_scaler()
         
         # Validate that we have data
         if len(self.all_sequences) == 0:
@@ -159,67 +147,6 @@ class FluidDataset(Dataset):
             logger.warning("No prediction mask loaded, creating default mask")
             self.prediction_mask = self.processor.create_prediction_mask()
     
-    def _fit_scaler(self):
-        """Fit normalization scaler on training data."""
-        logger.info("Fitting scaler on training sequences...")
-        
-        # Collect all sequence data for scaler fitting
-        all_data = []
-        
-        # Sample a subset for memory efficiency
-        sample_size = min(100, len(self.all_sequences))
-        sample_indices = np.linspace(0, len(self.all_sequences)-1, sample_size, dtype=int)
-        
-        for idx in sample_indices:
-            input_seq, target_seq = self.all_sequences[idx]
-            # Combine input and target for scaler fitting
-            all_data.append(input_seq.reshape(-1, self.total_dims))
-            all_data.append(target_seq.reshape(-1, self.total_dims))
-        
-        # Stack all data
-        combined_data = np.vstack(all_data)  # [N_samples, 6713]
-        
-        # Fit scaler
-        if self.scaler_type == 'standard':
-            self.scaler = StandardScaler()
-        else:
-            self.scaler = MinMaxScaler()
-        
-        self.scaler.fit(combined_data)
-        logger.info(f"Fitted {self.scaler_type} scaler on {combined_data.shape[0]} data points")
-    
-    def _normalize_data(self, data: np.ndarray, inverse: bool = False) -> np.ndarray:
-        """
-        Normalize or denormalize data using fitted scaler.
-        
-        Args:
-            data: Data to normalize/denormalize, shape [..., 6713]
-            inverse: If True, perform inverse transformation
-            
-        Returns:
-            Normalized/denormalized data
-        """
-        if self.scaler is None:
-            return data
-        
-        # Handle different input shapes
-        original_shape = data.shape
-        
-        if data.ndim == 3:  # [T, 6713] or similar
-            data_2d = data.reshape(-1, data.shape[-1])
-        elif data.ndim == 2:  # [T, 6713]
-            data_2d = data
-        else:
-            raise ValueError(f"Unsupported data shape: {data.shape}")
-        
-        # Apply transformation
-        if inverse:
-            transformed = self.scaler.inverse_transform(data_2d)
-        else:
-            transformed = self.scaler.transform(data_2d)
-        
-        # Reshape back to original shape
-        return transformed.reshape(original_shape)
     
     def __len__(self) -> int:
         """Return number of sequences in dataset."""
@@ -242,26 +169,21 @@ class FluidDataset(Dataset):
         input_seq, target_seq = self.all_sequences[idx]
         metadata = self.sequence_metadata[idx]
         
-        # Convert to numpy if needed
+        # Convert to numpy if needed and ensure float32 type
         if isinstance(input_seq, np.ndarray):
             input_data = input_seq.astype(np.float32)
         else:
-            input_data = input_seq
+            input_data = np.array(input_seq, dtype=np.float32)
             
         if isinstance(target_seq, np.ndarray):
             target_data = target_seq.astype(np.float32)
         else:
-            target_data = target_seq
+            target_data = np.array(target_seq, dtype=np.float32)
         
-        # Normalize if enabled
-        if self.normalize and self.scaler is not None:
-            input_data = self._normalize_data(input_data)
-            target_data = self._normalize_data(target_data)
-        
-        # Convert to tensors
-        input_tensor = torch.FloatTensor(input_data)    # [T, 6713]
-        target_tensor = torch.FloatTensor(target_data)  # [T, 6713]
-        mask_tensor = torch.from_numpy(self.prediction_mask).int()  # [6713]
+        # Convert to tensors - normalization will be handled in collate_fn
+        input_tensor = torch.FloatTensor(input_data)    # [T, 6712]
+        target_tensor = torch.FloatTensor(target_data)  # [T, 6712]
+        mask_tensor = torch.from_numpy(self.prediction_mask).int()  # [6712]
         
         # Create TensorDict
         batch = TensorDict({
@@ -296,58 +218,9 @@ class FluidDataset(Dataset):
             'num_sequences': len(self.all_sequences),
             'num_samples': len(self.sample_dirs),
             'total_dims': self.total_dims,
-            'sequence_length': self.sequence_length,
-            'normalized': self.normalize,
-            'scaler_type': self.scaler_type
+            'sequence_length': self.sequence_length
         }
     
-    def save_scaler(self, save_dir: str):
-        """Save fitted scaler to disk."""
-        if not self.normalize or self.scaler is None:
-            logger.warning("No scaler to save (normalize=False or scaler not fitted)")
-            return
-        
-        save_path = Path(save_dir)
-        save_path.mkdir(parents=True, exist_ok=True)
-        
-        with open(save_path / f'{self.scaler_type}_scaler.pkl', 'wb') as f:
-            pickle.dump(self.scaler, f)
-        
-        logger.info(f"Scaler saved to {save_path}")
-    
-    def load_scaler(self, save_dir: str):
-        """Load scaler from disk."""
-        save_path = Path(save_dir)
-        scaler_path = save_path / f'{self.scaler_type}_scaler.pkl'
-        
-        if scaler_path.exists():
-            with open(scaler_path, 'rb') as f:
-                self.scaler = pickle.load(f)
-            logger.info(f"Scaler loaded from {scaler_path}")
-        else:
-            logger.warning(f"Scaler file not found: {scaler_path}")
-    
-    def inverse_transform_predictions(self, predictions: torch.Tensor) -> torch.Tensor:
-        """
-        Inverse transform normalized predictions back to original scale.
-        
-        Args:
-            predictions: Normalized predictions tensor [..., 6712]
-            
-        Returns:
-            Predictions in original scale
-        """
-        if not self.normalize or self.scaler is None:
-            return predictions
-        
-        # Convert to numpy for scaler
-        predictions_np = predictions.detach().cpu().numpy()
-        
-        # Apply inverse transformation
-        predictions_original = self._normalize_data(predictions_np, inverse=True)
-        
-        # Convert back to tensor
-        return torch.from_numpy(predictions_original).to(predictions.device)
     
     def get_sample_by_id(self, sample_id: str) -> List[int]:
         """
@@ -366,12 +239,16 @@ class FluidDataset(Dataset):
         return indices
 
 
-def collate_fn(batch_list: List[TensorDict]) -> Dict[str, any]:
+def collate_fn(batch_list: List[TensorDict], 
+               normalizer: Optional[DataNormalizer] = None,
+               apply_normalization: bool = True) -> Dict[str, any]:
     """
-    Custom collate function for TensorDict batches.
+    Custom collate function for TensorDict batches with optional normalization.
     
     Args:
         batch_list: List of TensorDict samples
+        normalizer: Optional DataNormalizer instance for data normalization
+        apply_normalization: Whether to apply normalization (False for visualization)
         
     Returns:
         Regular dictionary with batched tensors
@@ -384,6 +261,12 @@ def collate_fn(batch_list: List[TensorDict]) -> Dict[str, any]:
     inputs = torch.stack([item['input'] for item in batch_list])      # [B, T, V]
     targets = torch.stack([item['target'] for item in batch_list])    # [B, T, V]
     prediction_masks = torch.stack([item['mask'] for item in batch_list])  # [B, V]
+    
+    # Apply normalization if requested and normalizer is provided
+    if apply_normalization and normalizer is not None and normalizer.fitted:
+        inputs = normalizer.transform(inputs)
+        targets = normalizer.transform(targets)
+        logger.debug(f"Applied {normalizer.method} normalization to batch")
     
     # 生成因果注意力mask [B, T, V]
     B, T, V = inputs.shape
@@ -410,5 +293,94 @@ def collate_fn(batch_list: List[TensorDict]) -> Dict[str, any]:
         'target': targets,                  # [B, T, V]  
         'prediction_mask': prediction_masks, # [B, V] - 哪些变量需要预测
         'attention_mask': attention_mask,   # [B, T, V] - decoder attention mask
-        'metadata': metadata
+        'metadata': metadata,
+        'normalized': apply_normalization and normalizer is not None  # 标记是否已归一化
     }
+
+
+def create_collate_fn(normalizer: Optional[DataNormalizer] = None,
+                     apply_normalization: bool = True):
+    """
+    创建带有归一化参数的collate函数。
+    
+    Args:
+        normalizer: 数据归一化器
+        apply_normalization: 是否应用归一化
+        
+    Returns:
+        配置好的collate函数
+    """
+    def _collate_fn(batch_list: List[TensorDict]) -> Dict[str, any]:
+        return collate_fn(batch_list, normalizer, apply_normalization)
+    
+    return _collate_fn
+
+
+def load_normalizer(data_dir: str, method: str = 'standard') -> Optional[DataNormalizer]:
+    """
+    加载预计算的归一化器。
+    
+    Args:
+        data_dir: 数据目录路径
+        method: 归一化方法
+        
+    Returns:
+        已加载的归一化器，如果加载失败返回None
+    """
+    try:
+        normalizer = DataNormalizer(data_dir, method=method)
+        if normalizer.load_stats():
+            logger.info(f"Successfully loaded {method} normalizer from {data_dir}")
+            return normalizer
+        else:
+            logger.warning(f"Failed to load {method} normalizer from {data_dir}")
+            return None
+    except Exception as e:
+        logger.error(f"Error loading normalizer: {e}")
+        return None
+
+
+def create_dataloader_with_normalization(dataset: FluidDataset,
+                                        batch_size: int = 32,
+                                        shuffle: bool = False,
+                                        num_workers: int = 0,
+                                        normalizer_method: str = 'standard',
+                                        apply_normalization: bool = True) -> torch.utils.data.DataLoader:
+    """
+    创建带有归一化功能的DataLoader。
+    
+    Args:
+        dataset: FluidDataset实例
+        batch_size: 批次大小
+        shuffle: 是否随机打乱
+        num_workers: 工作进程数
+        normalizer_method: 归一化方法
+        apply_normalization: 是否应用归一化（可视化时设为False）
+        
+    Returns:
+        配置好的DataLoader
+    """
+    # 加载归一化器
+    normalizer = None
+    if apply_normalization:
+        normalizer = load_normalizer(str(dataset.data_dir), normalizer_method)
+        if normalizer is None:
+            logger.warning("Normalizer not found. Consider running compute_normalization_stats.py first")
+    
+    # 创建collate函数
+    collate_func = create_collate_fn(normalizer, apply_normalization)
+    
+    # 创建DataLoader
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        collate_fn=collate_func,
+        pin_memory=torch.cuda.is_available()
+    )
+    
+    logger.info(f"Created DataLoader: batch_size={batch_size}, normalization={apply_normalization}, "
+               f"method={normalizer_method if normalizer else 'none'}")
+    
+    return dataloader
