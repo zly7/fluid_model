@@ -9,6 +9,7 @@
 *.xls
 *.json
 !.mcp.json
+!settings.local.json
 *.pkl
 *.h5
 *.hdf5
@@ -82,3 +83,5 @@ results/
 output/
 plots/
 figures/
+*PPT/
+.playwright*/

@@ -9,6 +9,7 @@ import plotly.express as px
 from typing import List, Dict, Optional, Tuple
 import uuid
 import random
+import re
 from datetime import datetime, timedelta
 
 # Add parent directory to path to import data modules
@@ -35,32 +36,85 @@ def get_available_datasets():
         return []
 
 @st.cache_data
-def get_available_variables(dataset_name: str) -> Tuple[List[str], List[str]]:
-    """Get available variables from a specific dataset.
+def get_available_variables(dataset_name: str, filter_pattern: str = None) -> Tuple[List[str], List[str], Dict[str, List[str]]]:
+    """Get available variables from a specific dataset with optional filtering.
     
     Returns:
-        Tuple of (boundary_variables, equipment_variables)
+        Tuple of (boundary_variables, equipment_variables, equipment_categorized)
     """
     try:
         boundary_data, equipment_data = load_dataset_data(dataset_name)
         
-        # Get boundary variables (exclude TIME) and shuffle them
+        # Get boundary variables (exclude TIME)
         boundary_vars = []
         if boundary_data is not None:
             boundary_vars = [col for col in boundary_data.columns if col != 'TIME']
-            random.shuffle(boundary_vars)
         
-        # Get equipment variables (exclude TIME) and shuffle them
+        # Get equipment variables (exclude TIME) and categorize by equipment type
         equipment_vars = []
+        equipment_categorized = {
+            'B (球阀/Ball Valves)': [],
+            'C (压缩机/Compressors)': [],
+            'H (管段/Pipeline Segments)': [],
+            'N (节点/Nodes)': [],
+            'P (管道/Pipelines)': [],
+            'R (调节阀/Control Valves)': [],
+            'T (气源/Gas Sources)': [],
+            'E (分输点/Distribution Points)': [],
+            'Other': []
+        }
+        
         if equipment_data is not None:
             equipment_vars = [col for col in equipment_data.columns if col != 'TIME']
-            random.shuffle(equipment_vars)
+            
+            # Categorize variables by equipment type based on naming pattern
+            for var in equipment_vars:
+                if var.startswith('B_'):
+                    equipment_categorized['B (球阀/Ball Valves)'].append(var)
+                elif var.startswith('C_'):
+                    equipment_categorized['C (压缩机/Compressors)'].append(var)
+                elif var.startswith('H_'):
+                    equipment_categorized['H (管段/Pipeline Segments)'].append(var)
+                elif var.startswith('N_'):
+                    equipment_categorized['N (节点/Nodes)'].append(var)
+                elif var.startswith('P_'):
+                    equipment_categorized['P (管道/Pipelines)'].append(var)
+                elif var.startswith('R_'):
+                    equipment_categorized['R (调节阀/Control Valves)'].append(var)
+                elif var.startswith('T_'):
+                    equipment_categorized['T (气源/Gas Sources)'].append(var)
+                elif var.startswith('E_'):
+                    equipment_categorized['E (分输点/Distribution Points)'].append(var)
+                else:
+                    equipment_categorized['Other'].append(var)
         
-        return boundary_vars, equipment_vars
+        # Apply regex filter if provided
+        if filter_pattern:
+            try:
+                regex_pattern = re.compile(filter_pattern, re.IGNORECASE)
+                boundary_vars = [var for var in boundary_vars if regex_pattern.search(var)]
+                equipment_vars = [var for var in equipment_vars if regex_pattern.search(var)]
+                
+                # Filter categorized equipment variables
+                for category in equipment_categorized:
+                    equipment_categorized[category] = [
+                        var for var in equipment_categorized[category] 
+                        if regex_pattern.search(var)
+                    ]
+            except re.error:
+                st.warning(f"Invalid regex pattern: {filter_pattern}")
+        
+        # Sort variables within each category
+        boundary_vars.sort()
+        equipment_vars.sort()
+        for category in equipment_categorized:
+            equipment_categorized[category].sort()
+        
+        return boundary_vars, equipment_vars, equipment_categorized
         
     except Exception as e:
         st.error(f"Failed to get variables for {dataset_name}: {e}")
-        return [], []
+        return [], [], {}
 
 @st.cache_data
 def load_dataset_data(dataset_name: str) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
@@ -101,18 +155,23 @@ def load_dataset_data(dataset_name: str) -> Tuple[Optional[pd.DataFrame], Option
                 df['TIME'] = pd.to_datetime(df['TIME'])
                 equipment_dfs.append(df)
         
-        # Combine all equipment data
+        # Combine all equipment data using pd.concat to avoid fragmentation
         equipment_data = None
         if equipment_dfs:
-            # Start with the first dataframe's TIME column
-            equipment_data = equipment_dfs[0][['TIME']].copy()
+            # Get TIME from first dataframe
+            base_time = equipment_dfs[0][['TIME']].copy()
             
-            # Add all columns from all equipment files
+            # Collect all non-TIME columns from all equipment files
+            all_columns = []
             for df in equipment_dfs:
-                # Add all columns except TIME
-                for col in df.columns:
-                    if col != 'TIME':
-                        equipment_data[col] = df[col]
+                # Select all columns except TIME
+                non_time_cols = [col for col in df.columns if col != 'TIME']
+                if non_time_cols:
+                    all_columns.append(df[non_time_cols])
+            
+            # Concatenate all columns at once to avoid fragmentation warning
+            if all_columns:
+                equipment_data = pd.concat([base_time] + all_columns, axis=1)
         
         return boundary_data, equipment_data
         
@@ -199,8 +258,8 @@ def create_multi_variable_plot(variable_selections: List[Dict]) -> go.Figure:
     
     return fig
 
-def variable_selection_row(row_id: str, available_datasets: List[str]):
-    """Create a single variable selection row."""
+def variable_selection_row(row_id: str, available_datasets: List[str], filter_pattern: str = None):
+    """Create a single variable selection row with enhanced categorization."""
     # Initialize session state for this row if not exists
     if 'dataset_selections' not in st.session_state:
         st.session_state.dataset_selections = {}
@@ -236,39 +295,97 @@ def variable_selection_row(row_id: str, available_datasets: List[str]):
     
     with col2:
         variables = []
+        equipment_categorized = {}
         if selected_dataset:
-            boundary_vars, equipment_vars = get_available_variables(selected_dataset)
+            boundary_vars, equipment_vars, equipment_categorized = get_available_variables(
+                selected_dataset, filter_pattern
+            )
             variables = boundary_vars + equipment_vars
         
+        # Create categorized options for better user experience
+        if variables:
+            # Group variables by category for display
+            variable_options = [""]
+            
+            # Add boundary variables if any
+            if boundary_vars:
+                variable_options.append("--- 边界条件变量 ---")
+                variable_options.extend(boundary_vars)
+            
+            # Add equipment variables by category if any
+            if equipment_vars:
+                variable_options.append("--- 设备参数变量 ---")
+                for category, vars_in_category in equipment_categorized.items():
+                    if vars_in_category:
+                        variable_options.append(f"-- {category} --")
+                        variable_options.extend(vars_in_category)
+        else:
+            variable_options = [""]
+        
         # Calculate index for current variable selection
-        variable_options = [""] + variables
+        display_options = variable_options
         variable_index = 0
+        
+        # Find the correct index, handling separators properly
         if current_variable and current_variable in variable_options:
             variable_index = variable_options.index(current_variable)
         elif selected_dataset != current_dataset:
-            # If dataset changed, reset to first option
+            # If dataset changed, find first selectable option
+            for i, option in enumerate(variable_options):
+                if option and not option.startswith("-"):
+                    variable_index = i
+                    break
+        
+        # Ensure index is within bounds and valid
+        if variable_index >= len(display_options):
             variable_index = 0
+        
+        # Ensure index corresponds to a valid option
+        if variable_index < len(display_options) and display_options[variable_index].startswith("-"):
+            # If we're pointing to a separator, find next valid option
+            for i in range(variable_index + 1, len(display_options)):
+                if display_options[i] and not display_options[i].startswith("-"):
+                    variable_index = i
+                    break
+            else:
+                # If no valid option found after, search from beginning
+                for i in range(len(display_options)):
+                    if display_options[i] and not display_options[i].startswith("-"):
+                        variable_index = i
+                        break
         
         selected_variable = st.selectbox(
             "变量",
-            options=variable_options,
-            index=variable_index,
+            options=display_options,
+            index=int(variable_index),
             key=f"variable_{row_id}",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            disabled=False
         )
+        
+        # Ensure selected variable is valid (not a separator)
+        if selected_variable and selected_variable.startswith("-"):
+            selected_variable = ""
         
         # Update session state when selection changes
         if selected_variable != current_variable:
             st.session_state.variable_selections[row_id] = selected_variable
     
     with col3:
-        # Show data source type
+        # Show data source type and equipment category
         if selected_dataset and selected_variable:
-            boundary_vars, equipment_vars = get_available_variables(selected_dataset)
+            boundary_vars, equipment_vars, equipment_categorized = get_available_variables(selected_dataset)
             if selected_variable in boundary_vars:
                 st.text("边界条件")
             elif selected_variable in equipment_vars:
-                st.text("设备参数")
+                # Determine which equipment category this variable belongs to
+                equipment_type = "设备参数"
+                for category, vars_in_category in equipment_categorized.items():
+                    if selected_variable in vars_in_category:
+                        # Extract the short equipment type (first character)
+                        equipment_type = category.split()[0]
+                        break
+                st.text(equipment_type)
     
     with col4:
         remove_clicked = st.button("🗑️", key=f"remove_{row_id}", help="删除此变量")
@@ -280,6 +397,29 @@ def variable_selection_row(row_id: str, available_datasets: List[str]):
         'row_id': row_id
     }
 
+def expand_wildcard_pattern(dataset_name: str, pattern: str) -> List[str]:
+    """Expand wildcard pattern to matching variable names."""
+    if '*' not in pattern:
+        return [pattern] if pattern else []
+    
+    # Convert wildcard to regex
+    regex_pattern = pattern.replace('*', '.*')
+    
+    try:
+        boundary_vars, equipment_vars, _ = get_available_variables(dataset_name, regex_pattern)
+        return boundary_vars + equipment_vars
+    except Exception as e:
+        st.error(f"Error expanding pattern '{pattern}': {e}")
+        return []
+
+def add_multiple_variables(dataset_name: str, variables: List[str]):
+    """Add multiple variables as new rows."""
+    for variable in variables:
+        new_row_id = str(uuid.uuid4())
+        st.session_state.variable_rows.append(new_row_id)
+        st.session_state.dataset_selections[new_row_id] = dataset_name
+        st.session_state.variable_selections[new_row_id] = variable
+
 def run_multi_variable_viewer():
     """Main application for multi-variable time series viewer."""
     
@@ -290,10 +430,11 @@ def run_multi_variable_viewer():
         initial_sidebar_state="expanded"
     )
     
-    st.title("📊 流体模型多变量时间序列可视化器")
+    st.title("📊 气体管网多变量时间序列可视化器")
     st.markdown("""
-    在单个时间序列图中比较不同数据集的多个变量。
-    添加变量选择行来比较不同管道样本的参数。
+    用于气体管道网络仿真数据的多变量对比可视化工具。
+    支持按设备类型分类（B-球阀、C-压缩机、P-管道等）和正则表达式过滤。
+    支持通配符批量添加变量（例如：N_005* 添加所有N_005相关变量）。
     时间窗口固定为2025年1月1日0点到24点。
     """)
     
@@ -316,6 +457,56 @@ def run_multi_variable_viewer():
     st.sidebar.header("变量选择")
     st.sidebar.markdown("选择要比较的数据集和变量：")
     
+    # Batch add variables section
+    st.sidebar.subheader("📦 批量添加变量")
+    st.sidebar.markdown("使用通配符批量添加变量（例如：N_005*）")
+    
+    col1, col2 = st.sidebar.columns([2, 1])
+    with col1:
+        batch_dataset = st.selectbox(
+            "批量数据集",
+            options=[""] + available_datasets,
+            key="batch_dataset",
+            help="选择要批量添加变量的数据集"
+        )
+    
+    batch_pattern = st.sidebar.text_input(
+        "通配符模式",
+        value="",
+        key="batch_pattern",
+        help="使用 * 作为通配符。例如：N_005* 匹配所有N_005开头的变量",
+        placeholder="例如：N_005* 或 B_001* 或 *_p_in"
+    )
+    
+    # Preview matching variables
+    if batch_dataset and batch_pattern:
+        matching_vars = expand_wildcard_pattern(batch_dataset, batch_pattern)
+        if matching_vars:
+            st.sidebar.markdown(f"**找到 {len(matching_vars)} 个匹配变量：**")
+            preview_vars = matching_vars[:5]  # Show first 5
+            for var in preview_vars:
+                st.sidebar.markdown(f"- {var}")
+            if len(matching_vars) > 5:
+                st.sidebar.markdown(f"... 还有 {len(matching_vars) - 5} 个变量")
+            
+            if st.sidebar.button("➕ 批量添加这些变量", key="batch_add"):
+                add_multiple_variables(batch_dataset, matching_vars)
+                st.sidebar.success(f"成功添加 {len(matching_vars)} 个变量！")
+                st.rerun()
+        else:
+            st.sidebar.warning("未找到匹配的变量")
+    
+    st.sidebar.markdown("---")
+    
+    # Add regex filter input
+    st.sidebar.subheader("🔍 变量过滤")
+    filter_pattern = st.sidebar.text_input(
+        "正则表达式过滤（可选）",
+        value="",
+        help="使用正则表达式过滤变量名。例如：'p_in|p_out' 匹配所有压力变量，'B_001' 匹配特定球阀变量",
+        placeholder="例如：p_in|p_out 或 ^B_ 或 .*temperature.*"
+    )
+    
     # Add new variable row button
     if st.sidebar.button("➕ 添加变量", key="add_variable"):
         st.session_state.variable_rows.append(str(uuid.uuid4()))
@@ -329,7 +520,7 @@ def run_multi_variable_viewer():
         st.sidebar.markdown(f"**变量 {len(variable_selections) + 1}:**")
         
         with st.sidebar.container():
-            selection = variable_selection_row(row_id, available_datasets)
+            selection = variable_selection_row(row_id, available_datasets, filter_pattern)
             
             if selection['remove_clicked'] and len(st.session_state.variable_rows) > 1:
                 rows_to_remove.append(row_id)
@@ -359,8 +550,16 @@ def run_multi_variable_viewer():
         # Show selected variables info
         with st.expander("📋 已选变量", expanded=False):
             for i, sel in enumerate(valid_selections, 1):
-                boundary_vars, equipment_vars = get_available_variables(sel['dataset'])
+                boundary_vars, equipment_vars, equipment_categorized = get_available_variables(sel['dataset'])
                 var_type = "边界条件" if sel['variable'] in boundary_vars else "设备参数"
+                
+                # Find specific equipment category if it's an equipment variable
+                if sel['variable'] in equipment_vars:
+                    for category, vars_in_category in equipment_categorized.items():
+                        if sel['variable'] in vars_in_category:
+                            var_type = category
+                            break
+                
                 st.write(f"{i}. **{sel['dataset']}**: {sel['variable']} ({var_type})")
         
         # Create and display the plot
@@ -409,7 +608,7 @@ def run_multi_variable_viewer():
         
         for i, dataset in enumerate(available_datasets, 1):
             with st.expander(f"{i}. {dataset}", expanded=False):
-                boundary_vars, equipment_vars = get_available_variables(dataset)
+                boundary_vars, equipment_vars, equipment_categorized = get_available_variables(dataset)
                 
                 col1, col2 = st.columns(2)
                 with col1:
@@ -422,11 +621,13 @@ def run_multi_variable_viewer():
                 
                 with col2:
                     st.write(f"**设备参数变量 ({len(equipment_vars)}):**")
-                    if equipment_vars:
-                        for var in equipment_vars[:10]:  # Show first 10
-                            st.write(f"- {var}")
-                        if len(equipment_vars) > 10:
-                            st.write(f"... 还有 {len(equipment_vars) - 10} 个变量")
+                    for category, vars_in_category in equipment_categorized.items():
+                        if vars_in_category:
+                            st.write(f"*{category} ({len(vars_in_category)}):*")
+                            for var in vars_in_category[:5]:  # Show first 5 per category
+                                st.write(f"  - {var}")
+                            if len(vars_in_category) > 5:
+                                st.write(f"  ... 还有 {len(vars_in_category) - 5} 个变量")
 
 if __name__ == "__main__":
     run_multi_variable_viewer()

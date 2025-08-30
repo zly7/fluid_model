@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天然气管网数值模拟数据格式说明</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1920px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 30px rgba(0,0,0,0.1);
+            aspect-ratio: 16/9;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #2c3e50, #3498db);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            overflow-y: auto;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-5px);
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .data-overview {
+            grid-column: 1 / -1;
+            background: linear-gradient(45deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+        }
+
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .file-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .file-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+
+        .file-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .boundary { color: #e74c3c; }
+        .ball-valve { color: #f39c12; }
+        .compressor { color: #9b59b6; }
+        .pipeline { color: #3498db; }
+        .node { color: #2ecc71; }
+        .segment { color: #34495e; }
+        .control-valve { color: #e67e22; }
+        .source { color: #1abc9c; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-box {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .time-structure {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .time-comparison {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+
+        .time-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .parameter-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .parameter-table th,
+        .parameter-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .parameter-table th {
+            background: #34495e;
+            color: white;
+            font-weight: bold;
+        }
+
+        .parameter-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .data-flow {
+            position: relative;
+            height: 200px;
+            background: linear-gradient(45deg, #a8edea 0%, #fed6e3 100%);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .flow-arrow {
+            position: absolute;
+            font-size: 3em;
+            color: #3498db;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.7; }
+        }
+
+        .equipment-count {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .count-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .count-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .scrollable {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2.5em;
+            }
+            
+            .container {
+                aspect-ratio: auto;
+                min-height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏭 天然气管网数值模拟数据格式</h1>
+            <p>Natural Gas Pipeline Network Simulation Data Format</p>
+        </div>
+
+        <div class="main-content">
+            <div class="section data-overview">
+                <h2>📊 数据集概览</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-number">294</div>
+                        <div>总算例数</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">264</div>
+                        <div>训练集算例</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">30</div>
+                        <div>测试集算例</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">6,713</div>
+                        <div>总变量维度</div>
+                    </div>
+                </div>
+                
+                <div class="equipment-count">
+                    <div class="count-item">
+                        <div class="count-number">7</div>
+                        <div>气源</div>
+                    </div>
+                    <div class="count-item">
+                        <div class="count-number">122</div>
+                        <div>分输点</div>
+                    </div>
+                    <div class="count-item">
+                        <div class="count-number">572</div>
+                        <div>节点</div>
+                    </div>
+                    <div class="count-item">
+                        <div class="count-number">343</div>
+                        <div>球阀</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📁 文件结构</h2>
+                <div class="file-grid">
+                    <div class="file-card">
+                        <span class="file-icon boundary">🎯</span>
+                        <h3>Boundary.csv</h3>
+                        <p><strong>539</strong> 列</p>
+                        <p>边界条件</p>
+                        <small>30分钟间隔</small>
+                    </div>
+                    <div class="file-card">
+                        <span class="file-icon ball-valve">⚙️</span>
+                        <h3>B.csv</h3>
+                        <p><strong>2,058</strong> 列</p>
+                        <p>球阀数据</p>
+                        <small>1分钟间隔</small>
+                    </div>
+                    <div class="file-card">
+                        <span class="file-icon compressor">🔧</span>
+                        <h3>C.csv</h3>
+                        <p><strong>161</strong> 列</p>
+                        <p>压缩机数据</p>
+                        <small>1分钟间隔</small>
+                    </div>
+                    <div class="file-card">
+                        <span class="file-icon segment">📏</span>
+                        <h3>H.csv</h3>
+                        <p><strong>192</strong> 列</p>
+                        <p>管段数据</p>
+                        <small>1分钟间隔</small>
+                    </div>
+                    <div class="file-card">
+                        <span class="file-icon node">🔗</span>
+                        <h3>N.csv</h3>
+                        <p><strong>1,716</strong> 列</p>
+                        <p>节点数据</p>
+                        <small>1分钟间隔</small>
+                    </div>
+                    <div class="file-card">
+                        <span class="file-icon pipeline">🚰</span>
+                        <h3>P.csv</h3>
+                        <p><strong>1,610</strong> 列</p>
+                        <p>管道数据</p>
+                        <small>1分钟间隔</small>
+                    </div>
+                    <div class="file-card">
+                        <span class="file-icon control-valve">🎛️</span>
+                        <h3>R.csv</h3>
+                        <p><strong>50</strong> 列</p>
+                        <p>调节阀数据</p>
+                        <small>1分钟间隔</small>
+                    </div>
+                    <div class="file-card">
+                        <span class="file-icon source">⛽</span>
+                        <h3>T&E.csv</h3>
+                        <p><strong>387</strong> 列</p>
+                        <p>气源和分输点</p>
+                        <small>1分钟间隔</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section time-structure">
+                <h2>⏱️ 时间结构</h2>
+                <div class="time-comparison">
+                    <div class="time-box">
+                        <h3>Boundary.csv</h3>
+                        <div class="stat-number" style="color: #e74c3c;">30</div>
+                        <p>分钟间隔</p>
+                        <small>48个时间点/天</small>
+                    </div>
+                    <div class="flow-arrow">➡️</div>
+                    <div class="time-box">
+                        <h3>其他文件</h3>
+                        <div class="stat-number" style="color: #27ae60;">1</div>
+                        <p>分钟间隔</p>
+                        <small>1440个时间点/天</small>
+                    </div>
+                </div>
+                <div style="background: white; margin-top: 20px; padding: 15px; border-radius: 10px;">
+                    <h4>时间格式示例：</h4>
+                    <p><strong>Boundary.csv:</strong> 2025/1/1 0:00, 2025/1/1 0:30, 2025/1/1 1:00...</p>
+                    <p><strong>其他文件:</strong> 2025/1/1 0:01, 2025/1/1 0:02, 2025/1/1 0:03...</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📋 参数说明</h2>
+                <div class="scrollable">
+                    <table class="parameter-table">
+                        <thead>
+                            <tr>
+                                <th>参数名称</th>
+                                <th>含义</th>
+                                <th>单位</th>
+                                <th>应用设备</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>p_in / p_out</td>
+                                <td>入口/出口压力</td>
+                                <td>MPa</td>
+                                <td>B, C, H, P, R</td>
+                            </tr>
+                            <tr>
+                                <td>q_in / q_out</td>
+                                <td>入口/出口流量</td>
+                                <td>m³/s</td>
+                                <td>B, C, H, P</td>
+                            </tr>
+                            <tr>
+                                <td>t_in / t_out</td>
+                                <td>入口/出口温度</td>
+                                <td>°C</td>
+                                <td>B, C, H, P, R</td>
+                            </tr>
+                            <tr>
+                                <td>p, q, t</td>
+                                <td>压力、流量、温度</td>
+                                <td>MPa, m³/s, °C</td>
+                                <td>N, T&E</td>
+                            </tr>
+                            <tr>
+                                <td>pwr</td>
+                                <td>功率</td>
+                                <td>kW</td>
+                                <td>C (压缩机)</td>
+                            </tr>
+                            <tr>
+                                <td>inv</td>
+                                <td>管存</td>
+                                <td>m³</td>
+                                <td>P (管道)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🔄 数据流向</h2>
+                <div class="data-flow">
+                    <div style="text-align: center; z-index: 1;">
+                        <h3 style="margin-bottom: 15px;">边界条件 → 网络仿真 → 状态预测</h3>
+                        <div class="legend">
+                            <div class="legend-item">
+                                <div class="legend-color boundary" style="background: #e74c3c;"></div>
+                                <span>输入边界</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: #3498db;"></div>
+                                <span>预测目标</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>🎛️ 边界条件参数</h2>
+                <div class="scrollable">
+                    <table class="parameter-table">
+                        <thead>
+                            <tr>
+                                <th>设备系列</th>
+                                <th>参数类型</th>
+                                <th>含义</th>
+                                <th>数量</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>T (气源)</td>
+                                <td>SNQ / SP</td>
+                                <td>设定标况流量 / 设定压力</td>
+                                <td>7</td>
+                            </tr>
+                            <tr>
+                                <td>E (分输)</td>
+                                <td>SNQ</td>
+                                <td>设定标况流量</td>
+                                <td>122</td>
+                            </tr>
+                            <tr>
+                                <td>C (压缩机)</td>
+                                <td>ST + SP_out</td>
+                                <td>运行状态 + 出口压力</td>
+                                <td>23</td>
+                            </tr>
+                            <tr>
+                                <td>R (调节阀)</td>
+                                <td>ST + SPD</td>
+                                <td>运行状态 + 下游压力</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td>B (球阀)</td>
+                                <td>FR</td>
+                                <td>阀门开度</td>
+                                <td>343</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 添加简单的交互效果
+        document.querySelectorAll('.file-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const fileName = this.querySelector('h3').textContent;
+                const columns = this.querySelector('p strong').textContent;
+                alert(`${fileName}\n列数: ${columns}\n点击查看详细信息`);
+            });
+        });
+
+        // 添加滚动动画
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        });
+
+        document.querySelectorAll('.section').forEach((section) => {
+            section.style.opacity = '0';
+            section.style.transform = 'translateY(20px)';
+            section.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html>
