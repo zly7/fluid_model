@@ -24,7 +24,8 @@
       "mcp__playwright__browser_press_key",
       "mcp__*",
       "Bash(cp:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

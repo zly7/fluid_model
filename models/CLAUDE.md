@@ -30,8 +30,8 @@
 ## 已完成
 现在你需要把整个模型完全兼容transformers仓库的Trainer和TrainingArguments，也就是意味着你需要返回loss，并且forward也需要兼容transformers仓库的要求的格式。LOSS用MSELoss】
 
-## 待完成
+## 已完成
 现在我发现这个模型的config我需要几个基础的文件大小，所以你需要帮我设置一个config的typedict类，并且在models/config/*.json里面设置各种模型大小，比如模型的隐藏层大小，attention的头的维度，以及其他config.py里面的参数。并且这个参数路径文件需要在根目录下面的configs里面体现，这里是训练的config文件目录，那么模型的大小也应该被包含在这个目录下面。
 
-## 方法论
-永远主动调用sequential-thinking来解决问题
+## 已完成
+现在整个模型已经可以跑起来了，但是我需要你实现别的对比的模型，并且把这个结构改成models\decoder\当前的一些文件目录，另外还需要对比CNN，LSTM,GCN三种实现。你当前先完成decoder的迁移工作，并且把别的模型的接口保留出来。
