@@ -175,7 +175,7 @@ class TrainingConfig:
             'max_grad_norm': self.gradient_clip_norm,
             'logging_dir': self.logging_dir,
             'logging_steps': min(self.eval_steps // 4, 100),
-            'evaluation_strategy': self.eval_strategy,
+            'eval_strategy': self.eval_strategy,
             'eval_steps': self.eval_steps,
             'save_strategy': self.save_strategy,
             'save_steps': self.save_steps,
@@ -189,7 +189,7 @@ class TrainingConfig:
             'dataloader_drop_last': self.dataloader_drop_last,
             'dataloader_num_workers': self.num_workers,
             'dataloader_pin_memory': self.pin_memory,
-            'report_to': ["wandb"] if self.use_wandb else [],
+            'report_to': ["swanlab"] if self.use_wandb else [],  # SwanLab integration
             'max_steps': self.max_steps if self.max_steps else -1,
             'disable_tqdm': False,
             'remove_unused_columns': False,  # Important for our custom data format

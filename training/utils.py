@@ -13,12 +13,11 @@ import numpy as np
 from pathlib import Path
 
 from transformers import set_seed
-import wandb
-
-from ..models import FluidDecoder
-from ..models.config import DecoderConfig
-from ..data.dataset import FluidDataset, create_dataloader_with_normalization
-from ..data.normalizer import load_normalizer
+import swanlab
+from models import FluidDecoder
+from models.config import DecoderConfig
+from data.dataset import FluidDataset, create_dataloader_with_normalization
+from data.normalizer import load_normalizer
 from .trainer import create_fluid_trainer, FluidTrainer
 from .config import TrainingConfig, create_default_training_config
 from .callbacks import create_default_callbacks
@@ -80,16 +79,16 @@ def setup_training_environment(config: TrainingConfig) -> None:
     # Save training config
     config.save_to_file(os.path.join(config.output_dir, "training_config.json"))
     
-    # Initialize Weights & Biases if configured
-    if config.use_wandb:
-        wandb.init(
+    # Initialize SwanLab if configured
+    if config.use_wandb:  # Keep config name for backward compatibility
+        swanlab.init(
             project=config.wandb_project,
-            entity=config.wandb_entity,
-            name=config.wandb_run_name,
+            workspace=config.wandb_entity,
+            experiment_name=config.wandb_run_name,
             config=config.to_dict(),
-            dir=config.output_dir
+            logdir=config.output_dir
         )
-        logger.info(f"Initialized W&B run: {config.wandb_run_name}")
+        logger.info(f"Initialized SwanLab run: {config.wandb_run_name}")
     
     logger.info("Training environment setup complete")
 
@@ -341,7 +340,7 @@ def run_training(trainer: FluidTrainer, resume_from_checkpoint: Optional[str] = 
     finally:
         # Cleanup
         if trainer.training_config.use_wandb:
-            wandb.finish()
+            swanlab.finish()
 
 
 def evaluate_model(

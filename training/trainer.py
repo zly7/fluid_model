@@ -14,9 +14,8 @@ from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 from transformers.trainer_utils import EvalPrediction
 import numpy as np
 
-from ..utils.metrics import compute_fluid_metrics
 from .config import TrainingConfig
-from ..data.normalizer import DataNormalizer
+from data.normalizer import DataNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +55,8 @@ class FluidTrainer(Trainer):
         self.training_config = training_config
         self.normalizer = normalizer
         
-        # Set up compute_metrics function
-        kwargs['compute_metrics'] = self._create_compute_metrics_fn()
+        # No need for custom compute_metrics since model loss is sufficient
+        # kwargs['compute_metrics'] = self._create_compute_metrics_fn()
         
         # Initialize parent trainer
         # Note: We pass train_dataset and eval_dataset as None since we provide dataloaders directly
@@ -92,48 +91,6 @@ class FluidTrainer(Trainer):
         """Return the evaluation dataloader."""
         return self._eval_dataloader if self._eval_dataloader is not None else None
     
-    def _create_compute_metrics_fn(self):
-        """Create the compute_metrics function for evaluation."""
-        
-        def compute_metrics(eval_pred: EvalPrediction) -> Dict[str, float]:
-            """
-            Compute evaluation metrics.
-            
-            Args:
-                eval_pred: EvalPrediction object with predictions and labels
-                
-            Returns:
-                Dictionary of metric names and values
-            """
-            predictions = eval_pred.predictions  # [B, T, V]
-            labels = eval_pred.label_ids  # [B, T, V]
-            
-            # Convert to torch tensors if numpy
-            if isinstance(predictions, np.ndarray):
-                predictions = torch.from_numpy(predictions).float()
-            if isinstance(labels, np.ndarray):
-                labels = torch.from_numpy(labels).float()
-            
-            # Denormalize if normalizer is available
-            if self.normalizer is not None and self.normalizer.fitted:
-                try:
-                    predictions = self.normalizer.inverse_transform(predictions)
-                    labels = self.normalizer.inverse_transform(labels)
-                    logger.debug("Applied denormalization for evaluation metrics")
-                except Exception as e:
-                    logger.warning(f"Failed to denormalize for metrics: {e}")
-            
-            # Compute metrics using our utility function
-            metrics = compute_fluid_metrics(
-                predictions=predictions,
-                targets=labels,
-                prediction_mask=None,  # Could add this if needed
-                boundary_dims=self.training_config.model_config.get('boundary_dims', 538) if self.training_config.model_config else 538
-            )
-            
-            return metrics
-        
-        return compute_metrics
     
     def evaluate(
         self,
@@ -162,9 +119,6 @@ class FluidTrainer(Trainer):
         # Log key metrics
         if f"{metric_key_prefix}_loss" in eval_results:
             logger.info(f"Evaluation loss: {eval_results[f'{metric_key_prefix}_loss']:.6f}")
-        
-        if f"{metric_key_prefix}_equipment_mse" in eval_results:
-            logger.info(f"Equipment MSE: {eval_results[f'{metric_key_prefix}_equipment_mse']:.6f}")
         
         return eval_results
     
