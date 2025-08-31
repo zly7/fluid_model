@@ -5,6 +5,7 @@ This package provides:
 - BaseModel: Abstract base class for all models
 - FluidDecoder: Decoder-only model for autoregressive prediction
 - FluidCNN: CNN model for time series prediction
+- FluidLSTM: LSTM model for time series prediction
 - ModelConfig: Configuration classes for models
 - Utility functions for model management
 """
@@ -12,6 +13,7 @@ This package provides:
 from .base import BaseModel, MaskedMSELoss
 from .decoder import FluidDecoder
 from .cnn import FluidCNN
+from .lstm import FluidLSTM
 from .config import (
     ModelConfig,
     DecoderConfig,
@@ -20,6 +22,7 @@ from .config import (
     load_config_from_file,
     save_config_to_file
 )
+from .lstm import LSTMConfig
 from .utils import (
     count_parameters,
     initialize_weights,
@@ -33,9 +36,11 @@ __all__ = [
     'MaskedMSELoss',
     'FluidDecoder',
     'FluidCNN',
+    'FluidLSTM',
     'ModelConfig',
     'DecoderConfig',
     'CNNConfig',
+    'LSTMConfig',
     'create_default_configs',
     'load_config_from_file',
     'save_config_to_file',

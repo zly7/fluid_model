@@ -14,8 +14,9 @@ from pathlib import Path
 
 from transformers import set_seed
 import swanlab
-from models import FluidDecoder, FluidCNN
+from models import FluidDecoder, FluidCNN, FluidLSTM
 from models.config import DecoderConfig, CNNConfig
+from models.lstm import LSTMConfig
 from data.dataset import FluidDataset, create_dataloader_with_normalization
 from data.normalizer import load_normalizer
 from .trainer import create_fluid_trainer, FluidTrainer
@@ -116,8 +117,10 @@ def create_model(config: TrainingConfig) -> nn.Module:
         model = FluidDecoder(config=model_config)
     elif model_config.model_name.lower() == "fluidcnn":
         model = FluidCNN(config=model_config)
+    elif model_config.model_name.lower() == "fluidlstm":
+        model = FluidLSTM(config=model_config)
     else:
-        raise ValueError(f"Unknown model name: {model_config.model_name}")
+        raise ValueError(f"Unknown model name: {model_config.model_name}. Supported models: FluidDecoder, FluidCNN, FluidLSTM")
     
     # Log model info
     model_info = model.get_model_info()

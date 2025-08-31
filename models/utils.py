@@ -13,6 +13,7 @@ import warnings
 from .base import BaseModel
 from .decoder import FluidDecoder
 from .cnn import FluidCNN
+from .lstm import FluidLSTM, LSTMConfig
 from .config import ModelConfig, DecoderConfig, CNNConfig, load_config_from_file
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ def create_model(model_type: str, config: Optional[Union[ModelConfig, Dict, str]
     Factory function to create models.
     
     Args:
-        model_type: Type of model ('decoder', 'cnn')
+        model_type: Type of model ('decoder', 'cnn', 'lstm')
         config: Model configuration (Config object, dict, or path to JSON file)
         **kwargs: Additional parameters to override config
         
@@ -101,6 +102,8 @@ def create_model(model_type: str, config: Optional[Union[ModelConfig, Dict, str]
             config = DecoderConfig.from_dict(config)
         elif model_type.lower() == 'cnn':
             config = CNNConfig.from_dict(config)
+        elif model_type.lower() == 'lstm':
+            config = LSTMConfig.from_dict(config)
         else:
             config = ModelConfig.from_dict(config)
     
@@ -117,8 +120,10 @@ def create_model(model_type: str, config: Optional[Union[ModelConfig, Dict, str]
         model = FluidDecoder(config)
     elif model_type == 'cnn':
         model = FluidCNN(config)
+    elif model_type == 'lstm':
+        model = FluidLSTM(config)
     else:
-        raise ValueError(f"Unknown model type: {model_type}. Supported types: 'decoder', 'cnn'")
+        raise ValueError(f"Unknown model type: {model_type}. Supported types: 'decoder', 'cnn', 'lstm'")
     
     logger.info(f"Created {model_type} model with {count_parameters(model)} parameters")
     return model

@@ -140,12 +140,25 @@ def load_config_from_file(filepath: str) -> ModelConfig:
     with open(filepath, 'r') as f:
         config_dict = json.load(f)
     
+    # Determine model type from filename or model_name
     model_type = config_dict.get('model_name', '').lower()
+    if not model_type:
+        # Infer from filename
+        filename = filepath.lower()
+        if 'decoder' in filename:
+            model_type = 'decoder'
+        elif 'cnn' in filename:
+            model_type = 'cnn'
+        elif 'lstm' in filename:
+            model_type = 'lstm'
     
-    if 'decoder' in model_type:
+    if 'decoder' in model_type or model_type == 'fluiddecoder':
         return DecoderConfig.from_dict(config_dict)
-    elif 'cnn' in model_type:
+    elif 'cnn' in model_type or model_type == 'fluidcnn':
         return CNNConfig.from_dict(config_dict)
+    elif 'lstm' in model_type or model_type == 'fluidlstm':
+        from .lstm.config import LSTMConfig
+        return LSTMConfig.from_dict(config_dict)
     else:
         return ModelConfig.from_dict(config_dict)
 

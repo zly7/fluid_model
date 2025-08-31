@@ -100,6 +100,9 @@ def main():
     elif hasattr(model_config, 'hidden_channels'):
         # CNN model
         logger.info(f"Model size: hidden_channels={model_config.hidden_channels}, num_conv_layers={model_config.num_conv_layers}, kernel_sizes={model_config.kernel_sizes}")
+    elif hasattr(model_config, 'hidden_dim'):
+        # LSTM model
+        logger.info(f"Model size: hidden_dim={model_config.hidden_dim}, num_layers={model_config.num_layers}, bidirectional={model_config.bidirectional}")
     else:
         logger.info(f"Model configuration loaded from: {config.model_config_path}")
     logger.info(f"Data dir: {config.data_dir}")

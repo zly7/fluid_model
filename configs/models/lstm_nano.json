@@ -1,0 +1,21 @@
+{
+  "model_name": "FluidLSTM",
+  "input_dim": 6712,
+  "output_dim": 6712,
+  "boundary_dims": 538,
+  "equipment_dims": 6174,
+  "hidden_dim": 128,
+  "num_layers": 1,
+  "bidirectional": false,
+  "dropout_rate": 0.1,
+  "boundary_hidden_dim": 64,
+  "equipment_hidden_dim": 128,
+  "projection_hidden_dim": 256,
+  "batch_norm": true,
+  "activation": "tanh",
+  "use_attention": false,
+  "attention_heads": 4,
+  "use_layer_norm": true,
+  "recurrent_dropout": 0.0,
+  "weight_dropout": 0.1
+}
