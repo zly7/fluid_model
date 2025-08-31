@@ -88,14 +88,19 @@ def main():
     logger.info("=" * 60)
     logger.info("TRAINING CONFIGURATION")
     logger.info("=" * 60)
-    logger.info(f"Model: {config.model_name}")
+    # Load model configuration
+    model_config = config.load_model_config()
+    
+    logger.info(f"Model: {model_config.model_name}")
+    logger.info(f"Model config: {config.model_config_path}")
+    logger.info(f"Model size: d_model={model_config.d_model}, n_heads={model_config.n_heads}, n_layers={model_config.n_layers}")
     logger.info(f"Data dir: {config.data_dir}")
     logger.info(f"Output dir: {config.output_dir}")
     logger.info(f"Epochs: {config.num_train_epochs}")
     logger.info(f"Batch size: {config.train_batch_size}")
     logger.info(f"Learning rate: {config.learning_rate}")
     logger.info(f"Mixed precision: {config.mixed_precision}")
-    logger.info(f"Use SwanLab: {config.use_wandb}")  # Keep config name for backward compatibility
+    logger.info(f"Use SwanLab: {config.use_swanlab}")  # Keep config name for backward compatibility
     logger.info(f"Debug mode: {config.debug_mode}")
     logger.info("=" * 60)
     
@@ -164,7 +169,7 @@ def main():
     print("\n" + "="*60)
     print("TRAINING COMPLETED SUCCESSFULLY")
     print("="*60)
-    print(f"Model: {config.model_name}")
+    print(f"Model: {model_config.model_name}")
     print(f"Total epochs: {config.num_train_epochs}")
     print(f"Total steps: {training_results.get('total_steps', 'N/A')}")
     print(f"Best metric: {training_results.get('best_metric', 'N/A')}")

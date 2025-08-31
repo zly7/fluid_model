@@ -80,7 +80,7 @@ def setup_training_environment(config: TrainingConfig) -> None:
     config.save_to_file(os.path.join(config.output_dir, "training_config.json"))
     
     # Initialize SwanLab if configured
-    if config.use_wandb:  # Keep config name for backward compatibility
+    if config.use_swanlab:  # Keep config name for backward compatibility
         swanlab.init(
             project=config.wandb_project,
             workspace=config.wandb_entity,
@@ -105,19 +105,17 @@ def create_model(config: TrainingConfig) -> nn.Module:
     """
     logger.info("Creating model...")
     
-    # Create model config
-    if config.model_config is not None:
-        model_config = DecoderConfig.from_dict(config.model_config)
-    else:
-        model_config = DecoderConfig()
-        # Override with training config values where appropriate
-        model_config.sequence_length = config.sequence_length
+    # Load model config from separate file
+    model_config = config.load_model_config()
+    
+    # Override with training config values where appropriate
+    model_config.sequence_length = config.sequence_length
     
     # Create model
-    if config.model_name.lower() == "fluiddecoder":
+    if model_config.model_name.lower() == "fluiddecoder":
         model = FluidDecoder(config=model_config)
     else:
-        raise ValueError(f"Unknown model name: {config.model_name}")
+        raise ValueError(f"Unknown model name: {model_config.model_name}")
     
     # Log model info
     model_info = model.get_model_info()
@@ -339,7 +337,7 @@ def run_training(trainer: FluidTrainer, resume_from_checkpoint: Optional[str] = 
         raise
     finally:
         # Cleanup
-        if trainer.training_config.use_wandb:
+        if trainer.training_config.use_swanlab:
             swanlab.finish()
 
 
@@ -394,7 +392,7 @@ def evaluate_model(
 
 
 def create_trainer(
-    model_name: str = "FluidDecoder",
+    model_config_path: str = "configs/models/medium.json",
     data_dir: str = "./data",
     output_dir: str = "./outputs",
     **kwargs
@@ -403,7 +401,7 @@ def create_trainer(
     Convenience function to create a trainer with minimal configuration.
     
     Args:
-        model_name: Name of the model to use
+        model_config_path: Path to model configuration file
         data_dir: Path to data directory
         output_dir: Path to output directory
         **kwargs: Additional configuration parameters
@@ -412,7 +410,7 @@ def create_trainer(
         Configured FluidTrainer
     """
     config = create_default_training_config(
-        model_name=model_name,
+        model_config_path=model_config_path,
         data_dir=data_dir,
         output_dir=output_dir,
         **kwargs

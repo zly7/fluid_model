@@ -60,11 +60,14 @@ class FluidTrainer(Trainer):
         
         # Initialize parent trainer
         # Note: We pass train_dataset and eval_dataset as None since we provide dataloaders directly
+        # But if eval_dataloader exists, we need to provide a dummy eval_dataset to satisfy transformers checks
+        dummy_eval_dataset = [] if eval_dataloader is not None else None
+        
         super().__init__(
             model=model,
             args=args,
             train_dataset=None,  # We use dataloaders instead
-            eval_dataset=None,
+            eval_dataset=dummy_eval_dataset,
             **kwargs
         )
         
@@ -122,12 +125,13 @@ class FluidTrainer(Trainer):
         
         return eval_results
     
-    def log(self, logs: Dict[str, float]):
+    def log(self, logs: Dict[str, float], start_time=None):
         """
         Custom logging with additional context.
         
         Args:
             logs: Dictionary of logs to record
+            start_time: Optional start time for timing calculations
         """
         # Add training configuration context to logs
         if self.state.epoch is not None:
@@ -140,8 +144,8 @@ class FluidTrainer(Trainer):
         if hasattr(self.lr_scheduler, 'get_last_lr'):
             logs["learning_rate"] = self.lr_scheduler.get_last_lr()[0]
         
-        # Call parent log method
-        super().log(logs)
+        # Call parent log method with start_time parameter
+        super().log(logs, start_time)
     
     def save_model(self, output_dir: Optional[str] = None, _internal_call: bool = False):
         """
@@ -161,11 +165,7 @@ class FluidTrainer(Trainer):
         config_path = os.path.join(output_dir, "training_config.json")
         self.training_config.save_to_file(config_path)
         
-        # Save normalizer if available
-        if self.normalizer is not None:
-            normalizer_path = os.path.join(output_dir, "normalizer_stats.npz")
-            self.normalizer.save_stats(normalizer_path)
-            logger.info(f"Saved normalizer stats to {normalizer_path}")
+        # Normalizer stats are static and don't need to be saved with each model
         
         # Save additional metadata
         metadata = {
@@ -239,7 +239,7 @@ class FluidTrainer(Trainer):
         
         return (loss, predictions, labels)
     
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
         Custom loss computation.
         
@@ -247,6 +247,7 @@ class FluidTrainer(Trainer):
             model: The model
             inputs: Model inputs
             return_outputs: Whether to return outputs
+            num_items_in_batch: Number of items in batch (for newer transformers versions)
             
         Returns:
             Loss tensor, optionally with outputs
@@ -291,8 +292,18 @@ def create_fluid_trainer(
     Returns:
         Configured FluidTrainer instance
     """
+    # Get training arguments
+    training_args_dict = training_config.get_transformers_training_args()
+    
+    # If no eval_dataloader provided, disable evaluation
+    if eval_dataloader is None:
+        training_args_dict['eval_strategy'] = 'no'
+        training_args_dict['save_strategy'] = 'steps'  # Keep save_strategy as is
+        training_args_dict['load_best_model_at_end'] = False
+        logger.warning("No evaluation dataloader provided. Disabling evaluation.")
+    
     # Convert training config to transformers arguments
-    training_args = TrainingArguments(**training_config.get_transformers_training_args())
+    training_args = TrainingArguments(**training_args_dict)
     
     # Create trainer
     trainer = FluidTrainer(

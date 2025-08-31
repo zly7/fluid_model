@@ -35,8 +35,7 @@ class TrainingConfig:
     accumulation_steps: int = 1
     
     # Model parameters
-    model_name: str = "FluidDecoder"
-    model_config: Optional[Dict[str, Any]] = None
+    model_config_path: str = "configs/models/medium.json"  # Path to model config file
     
     # Output and logging
     output_dir: str = "./outputs"
@@ -77,7 +76,7 @@ class TrainingConfig:
     dataloader_drop_last: bool = False
     
     # Weights & Biases integration
-    use_wandb: bool = False
+    use_swanlab: bool = False
     wandb_project: Optional[str] = "fluid-dynamics"
     wandb_entity: Optional[str] = None
     wandb_run_name: Optional[str] = None
@@ -109,7 +108,8 @@ class TrainingConfig:
         if self.run_name is None:
             import datetime
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.run_name = f"{self.model_name}_{timestamp}"
+            model_size = Path(self.model_config_path).stem  # Get model size from filename
+            self.run_name = f"FluidDecoder_{model_size}_{timestamp}"
         
         # W&B setup
         if self.wandb_run_name is None:
@@ -155,6 +155,11 @@ class TrainingConfig:
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(self.to_json())
     
+    def load_model_config(self):
+        """Load model configuration from the specified path."""
+        from models.config import load_config_from_file
+        return load_config_from_file(self.model_config_path)
+    
     def get_transformers_training_args(self) -> Dict[str, Any]:
         """
         Convert to transformers TrainingArguments format.
@@ -162,7 +167,7 @@ class TrainingConfig:
         Returns:
             Dict compatible with transformers.TrainingArguments
         """
-        return {
+        args = {
             'output_dir': self.output_dir,
             'num_train_epochs': self.num_train_epochs,
             'per_device_train_batch_size': self.train_batch_size,
@@ -171,7 +176,6 @@ class TrainingConfig:
             'learning_rate': self.learning_rate,
             'weight_decay': self.weight_decay,
             'warmup_ratio': self.warmup_ratio,
-            'warmup_steps': self.warmup_steps,
             'max_grad_norm': self.gradient_clip_norm,
             'logging_dir': self.logging_dir,
             'logging_steps': min(self.eval_steps // 4, 100),
@@ -189,11 +193,17 @@ class TrainingConfig:
             'dataloader_drop_last': self.dataloader_drop_last,
             'dataloader_num_workers': self.num_workers,
             'dataloader_pin_memory': self.pin_memory,
-            'report_to': ["swanlab"] if self.use_wandb else [],  # SwanLab integration
+            'report_to': ["swanlab"] if self.use_swanlab else [],  # SwanLab integration
             'max_steps': self.max_steps if self.max_steps else -1,
             'disable_tqdm': False,
             'remove_unused_columns': False,  # Important for our custom data format
         }
+        
+        # Only include warmup_steps if it's explicitly set (not None)
+        if self.warmup_steps is not None:
+            args['warmup_steps'] = self.warmup_steps
+            
+        return args
 
 
 def create_default_training_config(**kwargs) -> TrainingConfig:
