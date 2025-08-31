@@ -1,5 +1,5 @@
 ## 测试规范
-调用MCP 里面的playright测试streamlit的运行，调用MCP里面的sequential-thinking进行深度思考，然后已经要至少增加到4个变量进行测试。多调用playright MCP交互以测试完整性。当前的这个CLAUDE.md文件不要写入更改。你可以把新功能的介绍写在README.md里。
+调用MCP 里面的playwright测试streamlit的运行，调用MCP里面的sequential-thinking进行深度思考，然后已经要至少增加到4个变量进行测试。多调用playwright MCP交互以测试完整性。当前的这个CLAUDE.md文件不要写入更改。你可以把新功能的介绍写在README.md里。
 
 
 ## 已完成

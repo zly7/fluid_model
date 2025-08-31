@@ -1,4 +1,5 @@
-# Training 模块设计文档
+# 已完成
+## Training 模块设计文档
 
 ## 任务概述
 基于已完成的 @models (FluidDecoder) 和 @data (数据处理) 模块，设计完整的训练框架。
@@ -36,3 +37,6 @@ training/
 2. **训练配置** - 设置 TrainingArguments 参数
 3. **训练执行** - Trainer 自动化训练循环
 4. **模型保存** - 保存最佳检查点和最终模型，最后report to SwanLab的 Swanlog
+
+# 待修复的bug
+compute_fluid_metrics已经没有这个函数了呃，最新的models是
