@@ -25,7 +25,10 @@
       "mcp__*",
       "Bash(cp:*)",
       "Bash(pip install:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

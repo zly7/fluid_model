@@ -93,7 +93,15 @@ def main():
     
     logger.info(f"Model: {model_config.model_name}")
     logger.info(f"Model config: {config.model_config_path}")
-    logger.info(f"Model size: d_model={model_config.d_model}, n_heads={model_config.n_heads}, n_layers={model_config.n_layers}")
+    # Log model-specific configuration
+    if hasattr(model_config, 'd_model'):
+        # Decoder/Transformer model
+        logger.info(f"Model size: d_model={model_config.d_model}, n_heads={model_config.n_heads}, n_layers={model_config.n_layers}")
+    elif hasattr(model_config, 'hidden_channels'):
+        # CNN model
+        logger.info(f"Model size: hidden_channels={model_config.hidden_channels}, num_conv_layers={model_config.num_conv_layers}, kernel_sizes={model_config.kernel_sizes}")
+    else:
+        logger.info(f"Model configuration loaded from: {config.model_config_path}")
     logger.info(f"Data dir: {config.data_dir}")
     logger.info(f"Output dir: {config.output_dir}")
     logger.info(f"Epochs: {config.num_train_epochs}")

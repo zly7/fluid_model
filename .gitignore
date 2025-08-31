@@ -11,7 +11,7 @@
 !.mcp.json
 !settings.local.json
 !configs/*.json
-!configs/models/*.json
+!configs/models/**/*.json
 *.pkl
 *.h5
 *.hdf5

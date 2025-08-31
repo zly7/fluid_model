@@ -35,7 +35,7 @@ class TrainingConfig:
     accumulation_steps: int = 1
     
     # Model parameters
-    model_config_path: str = "configs/models/medium.json"  # Path to model config file
+    model_config_path: str = "configs/models/decoder/medium.json"  # Path to model config file
     
     # Output and logging
     output_dir: str = "./outputs"

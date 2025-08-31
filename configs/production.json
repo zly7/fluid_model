@@ -11,7 +11,7 @@
   "scheduler_type": "cosine",
   "gradient_clip_norm": 1.0,
   "accumulation_steps": 2,
-  "model_config_path": "configs/models/extra_large.json",
+  "model_config_path": "configs/models/decoder/extra_large.json",
   "output_dir": "./outputs/production",
   "eval_steps": 1000,
   "save_steps": 2000,
