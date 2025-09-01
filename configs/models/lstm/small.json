@@ -1,4 +1,5 @@
 {
+  "model_name": "FluidLSTM",
   "input_dim": 6712,
   "output_dim": 6712,
   "boundary_dims": 538,
