@@ -33,6 +33,27 @@ def setup_training_environment(config: TrainingConfig) -> None:
     Args:
         config: Training configuration
     """
+    # 首先设置CUDA_VISIBLE_DEVICES环境变量，必须在任何PyTorch操作之前
+    if hasattr(config, 'device') and config.device is not None and config.device != "auto":
+        if isinstance(config.device, str):
+            if config.device.startswith('cuda:'):
+                # Extract GPU ID from cuda:X format
+                gpu_id = config.device.split(':')[1]
+                os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
+            elif config.device.lower() == 'cpu':
+                # Use CPU only - set empty CUDA_VISIBLE_DEVICES
+                os.environ['CUDA_VISIBLE_DEVICES'] = ""
+            elif config.device.isdigit():
+                # String GPU ID
+                os.environ['CUDA_VISIBLE_DEVICES'] = config.device
+        elif isinstance(config.device, int):
+            # Integer GPU ID - special handling for negative values (CPU mode)
+            if config.device < 0:
+                # Use CPU only - set empty CUDA_VISIBLE_DEVICES
+                os.environ['CUDA_VISIBLE_DEVICES'] = ""
+            else:
+                os.environ['CUDA_VISIBLE_DEVICES'] = str(config.device)
+    
     # Set up logging
     log_level = logging.DEBUG if config.debug_mode else logging.INFO
     logging.basicConfig(
@@ -61,17 +82,42 @@ def setup_training_environment(config: TrainingConfig) -> None:
     
     logger.info(f"Random seeds set to {config.seed}")
     
-    # Device setup
+    # Device setup - 修复多GPU强制使用bug
     if config.device == "auto":
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            gpu_count = torch.cuda.device_count()
+            if gpu_count > 1:
+                device = f"cuda"  # For multi-GPU, use DataParallel/DistributedDataParallel
+                logger.info(f"Found {gpu_count} GPUs, using all GPUs")
+            else:
+                device = "cuda:0"
+        else:
+            device = "cpu"
+    elif isinstance(config.device, (int, str)) and str(config.device).isdigit():
+        # If device is a number, convert to cuda:x format and use only that GPU
+        gpu_id = int(config.device)
+        if torch.cuda.is_available() and gpu_id < torch.cuda.device_count():
+            device = f"cuda:{gpu_id}"
+            logger.info(f"Using specified GPU {gpu_id} only")
+        else:
+            logger.warning(f"GPU {gpu_id} not available, falling back to CPU")
+            device = "cpu"
     else:
         device = config.device
     
     logger.info(f"Using device: {device}")
     
-    if device == "cuda":
-        logger.info(f"GPU: {torch.cuda.get_device_name()}")
-        logger.info(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+    if device.startswith("cuda"):
+        if device == "cuda":
+            # Multi-GPU setup
+            for i in range(torch.cuda.device_count()):
+                logger.info(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+                logger.info(f"GPU {i} memory: {torch.cuda.get_device_properties(i).total_memory / 1024**3:.1f} GB")
+        else:
+            # Single GPU setup
+            gpu_id = int(device.split(":")[1]) if ":" in device else 0
+            logger.info(f"GPU {gpu_id}: {torch.cuda.get_device_name(gpu_id)}")
+            logger.info(f"GPU {gpu_id} memory: {torch.cuda.get_device_properties(gpu_id).total_memory / 1024**3:.1f} GB")
     
     # Create output directories
     os.makedirs(config.output_dir, exist_ok=True)
@@ -83,13 +129,13 @@ def setup_training_environment(config: TrainingConfig) -> None:
     # Initialize SwanLab if configured
     if config.use_swanlab:  # Keep config name for backward compatibility
         swanlab.init(
-            project=config.wandb_project,
-            workspace=config.wandb_entity,
-            experiment_name=config.wandb_run_name,
+            project=config.swanlab_project,
+            workspace=config.swanlab_entity,
+            experiment_name=config.swanlab_run_name,
             config=config.to_dict(),
             logdir=config.output_dir
         )
-        logger.info(f"Initialized SwanLab run: {config.wandb_run_name}")
+        logger.info(f"Initialized SwanLab run: {config.swanlab_run_name}")
     
     logger.info("Training environment setup complete")
 

@@ -202,7 +202,6 @@ class FluidCNN(BaseModel):
         self.boundary_projection = nn.Sequential(
             nn.Linear(config.boundary_dims, config.boundary_hidden_dim),
             nn.ReLU() if config.activation == "relu" else nn.GELU(),
-            nn.BatchNorm1d(config.boundary_hidden_dim) if config.batch_norm else nn.Identity(),
             nn.Dropout(config.dropout_rate)
         )
         
@@ -210,7 +209,6 @@ class FluidCNN(BaseModel):
         self.equipment_projection = nn.Sequential(
             nn.Linear(config.equipment_dims, config.equipment_hidden_dim),
             nn.ReLU() if config.activation == "relu" else nn.GELU(),
-            nn.BatchNorm1d(config.equipment_hidden_dim) if config.batch_norm else nn.Identity(),
             nn.Dropout(config.dropout_rate)
         )
         
@@ -221,7 +219,7 @@ class FluidCNN(BaseModel):
                 kernel_sizes=config.kernel_sizes,
                 dilation_rates=config.dilation_rates,
                 activation=config.activation,
-                batch_norm=config.batch_norm,
+                batch_norm=False,  # 禁用BatchNorm避免单样本问题
                 use_residual=config.use_residual,
                 dropout=config.dropout_rate
             ) for _ in range(config.num_conv_layers)
@@ -234,7 +232,7 @@ class FluidCNN(BaseModel):
                 kernel_sizes=config.kernel_sizes,
                 dilation_rates=config.dilation_rates,
                 activation=config.activation,
-                batch_norm=config.batch_norm,
+                batch_norm=False,  # 禁用BatchNorm避免单样本问题
                 use_residual=config.use_residual,
                 dropout=config.dropout_rate
             ) for _ in range(config.num_conv_layers)
@@ -245,7 +243,6 @@ class FluidCNN(BaseModel):
         self.feature_fusion = nn.Sequential(
             nn.Linear(total_hidden_dim, config.hidden_channels),
             nn.ReLU() if config.activation == "relu" else nn.GELU(),
-            nn.BatchNorm1d(config.hidden_channels) if config.batch_norm else nn.Identity(),
             nn.Dropout(config.dropout_rate)
         )
         
@@ -256,7 +253,7 @@ class FluidCNN(BaseModel):
                 kernel_sizes=config.kernel_sizes,
                 dilation_rates=config.dilation_rates,
                 activation=config.activation,
-                batch_norm=config.batch_norm,
+                batch_norm=False,  # 禁用BatchNorm避免单样本问题
                 use_residual=config.use_residual,
                 dropout=config.dropout_rate
             ) for _ in range(config.num_conv_layers // 2)  # 较少的全局层
@@ -266,7 +263,6 @@ class FluidCNN(BaseModel):
         self.output_projection = nn.Sequential(
             nn.Linear(config.hidden_channels, config.projection_hidden_dim),
             nn.ReLU() if config.activation == "relu" else nn.GELU(),
-            nn.BatchNorm1d(config.projection_hidden_dim) if config.batch_norm else nn.Identity(),
             nn.Dropout(config.dropout_rate),
             nn.Linear(config.projection_hidden_dim, config.output_dim)
         )

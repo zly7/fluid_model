@@ -93,7 +93,7 @@ pytorch
 可以使用transformers但是未必是必须的
 如果没有对应的模型则从pytorch开始构建
 暂时不用考虑分布式训练，采用单机单卡训练
-调用SwanLab，而不是Wandb
+调用SwanLab，而不是swanlab
 
 # 规范
 能够分到package 并且使用__init__.py就区分package，不要把代码全部写在根目录，但是package不宜太多，不应该超过5个。
