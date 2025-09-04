@@ -585,3 +585,27 @@ class DataNormalizer:
             })
         
         return summary
+
+
+def load_normalizer(data_dir: str, method: str = 'standard') -> Optional[DataNormalizer]:
+    """
+    加载已保存的归一化器。
+    
+    Args:
+        data_dir: 数据根目录路径
+        method: 归一化方法 ('standard', 'minmax', 'robust')
+        
+    Returns:
+        加载的DataNormalizer实例，如果加载失败则返回None
+    """
+    try:
+        normalizer = DataNormalizer(data_dir=data_dir, method=method)
+        if normalizer.load_stats():
+            logger.info(f"Successfully loaded {method} normalizer from {data_dir}")
+            return normalizer
+        else:
+            logger.warning(f"Failed to load normalizer stats from {data_dir}")
+            return None
+    except Exception as e:
+        logger.error(f"Error loading normalizer: {e}")
+        return None

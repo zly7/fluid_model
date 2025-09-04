@@ -22,11 +22,21 @@
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_press_key",
-      "mcp__*"
+      "mcp__*",
+      "Bash(cp:*)",
+      "Bash(pip install:*)",
+      "Bash(rm:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(tree:*)",
+      "Bash(nvidia-smi:*)",
+      "WebSearch",
+      "mcp__mcp-feedback-enhanced__interactive_feedback"
     ],
     "deny": [],
     "ask": []
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "context7",
     "sequential-thinking",

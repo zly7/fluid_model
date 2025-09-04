@@ -9,7 +9,7 @@ import math
 from typing import Dict, Optional, Tuple
 import logging
 
-from .base import BaseModel
+from ..base import BaseModel
 from .config import DecoderConfig
 
 logger = logging.getLogger(__name__)

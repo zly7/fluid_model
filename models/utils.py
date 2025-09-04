@@ -12,7 +12,9 @@ import warnings
 
 from .base import BaseModel
 from .decoder import FluidDecoder
-from .config import ModelConfig, DecoderConfig, load_config_from_file
+from .cnn import FluidCNN
+from .lstm import FluidLSTM, LSTMConfig
+from .config import ModelConfig, DecoderConfig, CNNConfig, load_config_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +86,7 @@ def create_model(model_type: str, config: Optional[Union[ModelConfig, Dict, str]
     Factory function to create models.
     
     Args:
-        model_type: Type of model ('transformer', 'decoder', 'lstm', 'lstm_layernorm', 'transformer_large')
+        model_type: Type of model ('decoder', 'cnn', 'lstm')
         config: Model configuration (Config object, dict, or path to JSON file)
         **kwargs: Additional parameters to override config
         
@@ -98,6 +100,10 @@ def create_model(model_type: str, config: Optional[Union[ModelConfig, Dict, str]
         # Convert dict to appropriate config class
         if model_type.lower() == 'decoder':
             config = DecoderConfig.from_dict(config)
+        elif model_type.lower() == 'cnn':
+            config = CNNConfig.from_dict(config)
+        elif model_type.lower() == 'lstm':
+            config = LSTMConfig.from_dict(config)
         else:
             config = ModelConfig.from_dict(config)
     
@@ -112,8 +118,12 @@ def create_model(model_type: str, config: Optional[Union[ModelConfig, Dict, str]
     
     if model_type == 'decoder':
         model = FluidDecoder(config)
+    elif model_type == 'cnn':
+        model = FluidCNN(config)
+    elif model_type == 'lstm':
+        model = FluidLSTM(config)
     else:
-        raise ValueError(f"Unknown model type: {model_type}. Only 'decoder' is supported.")
+        raise ValueError(f"Unknown model type: {model_type}. Supported types: 'decoder', 'cnn', 'lstm'")
     
     logger.info(f"Created {model_type} model with {count_parameters(model)} parameters")
     return model
@@ -337,6 +347,20 @@ def validate_model_config(config: ModelConfig) -> bool:
         
         if config.n_heads <= 0 or config.n_layers <= 0:
             raise ValueError("Number of heads and layers must be positive")
+    
+    # CNN-specific checks
+    if isinstance(config, CNNConfig):
+        if config.hidden_channels <= 0:
+            raise ValueError("Hidden channels must be positive")
+        
+        if config.num_conv_layers <= 0:
+            raise ValueError("Number of conv layers must be positive")
+        
+        if len(config.kernel_sizes) == 0:
+            raise ValueError("At least one kernel size must be specified")
+        
+        if any(k <= 0 or k % 2 == 0 for k in config.kernel_sizes):
+            raise ValueError("All kernel sizes must be positive and odd")
     
     return True
 
