@@ -219,7 +219,7 @@ class FluidCNN(BaseModel):
                 kernel_sizes=config.kernel_sizes,
                 dilation_rates=config.dilation_rates,
                 activation=config.activation,
-                batch_norm=False,  # 禁用BatchNorm避免单样本问题
+                batch_norm=False, 
                 use_residual=config.use_residual,
                 dropout=config.dropout_rate
             ) for _ in range(config.num_conv_layers)
@@ -232,7 +232,7 @@ class FluidCNN(BaseModel):
                 kernel_sizes=config.kernel_sizes,
                 dilation_rates=config.dilation_rates,
                 activation=config.activation,
-                batch_norm=False,  # 禁用BatchNorm避免单样本问题
+                batch_norm=False, 
                 use_residual=config.use_residual,
                 dropout=config.dropout_rate
             ) for _ in range(config.num_conv_layers)
@@ -253,10 +253,10 @@ class FluidCNN(BaseModel):
                 kernel_sizes=config.kernel_sizes,
                 dilation_rates=config.dilation_rates,
                 activation=config.activation,
-                batch_norm=False,  # 禁用BatchNorm避免单样本问题
+                batch_norm=False,  
                 use_residual=config.use_residual,
                 dropout=config.dropout_rate
-            ) for _ in range(config.num_conv_layers // 2)  # 较少的全局层
+            ) for _ in range(config.num_conv_layers // 2) 
         ])
         
         # 输出投影层
