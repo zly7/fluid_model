@@ -1,289 +1,273 @@
 """
-气源和分输点边界数据处理器
-处理Boundary.csv文件中的气源(T系列)和分输点(E系列)数据
+新的边界数据处理器
+专门处理Boundary.csv中指定的气源和分输点的SNQ数据
 """
 
 import pandas as pd
 import numpy as np
-import os
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
-import re
+from typing import Dict, List, Tuple, Optional
+import os
+import glob
 
 
 class BoundaryDataProcessor:
     """
-    边界数据处理器，专门处理气源和分输点的边界数据
+    边界数据处理器
+    专门用于提取和处理Boundary.csv中的特定气源和分输点数据
     """
     
-    def __init__(self, data_root: str):
-        """
-        初始化处理器
+    def __init__(self):
+        """初始化处理器"""
+        # 定义目标气源和分输点
+        self.gas_sources = ["T_002:SNQ", "T_003:SNQ", "T_004:SNQ"]
+        self.distribution_points = [
+            "E_001:SNQ", "E_002:SNQ", "E_003:SNQ", "E_004:SNQ", 
+            "E_005:SNQ", "E_006:SNQ", "E_007:SNQ", "E_008:SNQ", 
+            "E_009:SNQ", "E_060:SNQ", "E_061:SNQ", "E_062:SNQ", 
+            "E_109:SNQ"
+        ]
         
-        Args:
-            data_root: 数据根目录路径
-        """
-        self.data_root = Path(data_root)
-        self.train_dir = self.data_root / "train"
-        self.test_dir = self.data_root / "test"
+        # 所有目标列
+        self.target_columns = self.gas_sources + self.distribution_points
         
-        # 气源和分输点相关的列标识
-        self.gas_source_pattern = re.compile(r'T_\d{3}:(SNQ|SP)')
-        self.distribution_point_pattern = re.compile(r'E_\d{3}:SNQ')
-        
-    def find_all_boundary_files(self) -> List[Path]:
-        """
-        查找所有Boundary.csv文件
-        
-        Returns:
-            包含所有Boundary.csv文件路径的列表
-        """
-        boundary_files = []
-        
-        # 查找训练集中的文件
-        if self.train_dir.exists():
-            boundary_files.extend(list(self.train_dir.glob("*/Boundary.csv")))
-            
-        # 查找测试集中的文件
-        if self.test_dir.exists():
-            boundary_files.extend(list(self.test_dir.glob("*/Boundary.csv")))
-            
-        return sorted(boundary_files)
+        # 数据存储
+        self.processed_data = {}
     
-    def extract_te_columns(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[str]]:
+    def find_all_cases(self, data_root: str) -> List[str]:
         """
-        从Boundary.csv中提取气源(T)和分输点(E)相关的列
+        查找所有可用的算例
         
         Args:
-            df: Boundary数据框
+            data_root: 数据根目录
             
         Returns:
-            包含T和E列的数据框, T系列列名列表, E系列列名列表
+            算例列表
         """
-        # 获取所有列名
-        all_columns = df.columns.tolist()
+        data_path = Path(data_root)
         
-        # 提取气源(T系列)列
-        t_columns = []
-        for col in all_columns:
-            if self.gas_source_pattern.match(col):
-                t_columns.append(col)
-                
-        # 提取分输点(E系列)列  
-        e_columns = []
-        for col in all_columns:
-            if self.distribution_point_pattern.match(col):
-                e_columns.append(col)
+        # 查找训练集
+        train_cases = []
+        train_path = data_path / "train"
+        if train_path.exists():
+            for case_dir in train_path.glob("第*个算例"):
+                boundary_file = case_dir / "Boundary.csv"
+                if boundary_file.exists():
+                    train_cases.append(f"train_{case_dir.name}")
         
-        # 保留TIME列和T、E相关列
-        selected_columns = ['TIME'] + t_columns + e_columns
-        te_df = df[selected_columns].copy()
+        # 查找测试集
+        test_cases = []
+        test_path = data_path / "test"
+        if test_path.exists():
+            for case_dir in test_path.glob("第*个算例"):
+                boundary_file = case_dir / "Boundary.csv"
+                if boundary_file.exists():
+                    test_cases.append(f"test_{case_dir.name}")
         
-        return te_df, t_columns, e_columns
+        return sorted(train_cases + test_cases)
     
-    def expand_to_minute_level(self, df: pd.DataFrame) -> pd.DataFrame:
+    def load_boundary_data(self, data_root: str, case_name: str) -> Optional[pd.DataFrame]:
         """
-        将半小时级别的边界数据扩展为分钟级别
+        加载指定算例的边界数据
         
         Args:
-            df: 半小时级别的边界数据
+            data_root: 数据根目录
+            case_name: 算例名称 (格式: train_第001个算例 或 test_第265个算例)
             
         Returns:
-            分钟级别的边界数据
-        """
-        expanded_rows = []
-        
-        for i in range(len(df)):
-            current_row = df.iloc[i]
-            current_time = pd.to_datetime(current_row['TIME'])
-            
-            # 为当前半小时内的每一分钟创建数据行
-            for minute_offset in range(30):
-                minute_time = current_time + pd.Timedelta(minutes=minute_offset)
-                
-                # 创建新行
-                new_row = current_row.copy()
-                new_row['TIME'] = minute_time.strftime('%Y/%-m/%-d %H:%M')
-                expanded_rows.append(new_row)
-        
-        expanded_df = pd.DataFrame(expanded_rows)
-        return expanded_df.reset_index(drop=True)
-    
-    def process_single_boundary_file(self, file_path: Path) -> Dict[str, any]:
-        """
-        处理单个Boundary.csv文件
-        
-        Args:
-            file_path: Boundary.csv文件路径
-            
-        Returns:
-            处理结果字典
+            处理后的数据框
         """
         try:
-            # 读取文件
-            df = pd.read_csv(file_path)
+            # 解析算例路径
+            if case_name.startswith("train_"):
+                subset = "train"
+                case_folder = case_name[6:]  # 去掉 "train_"
+            elif case_name.startswith("test_"):
+                subset = "test"
+                case_folder = case_name[5:]  # 去掉 "test_"
+            else:
+                raise ValueError(f"Invalid case name format: {case_name}")
             
-            # 提取T和E相关列
-            te_df, t_columns, e_columns = self.extract_te_columns(df)
+            # 构建文件路径
+            data_path = Path(data_root)
+            boundary_file = data_path / subset / case_folder / "Boundary.csv"
             
-            # 扩展为分钟级别
-            minute_level_df = self.expand_to_minute_level(te_df)
+            if not boundary_file.exists():
+                print(f"Warning: Boundary file not found: {boundary_file}")
+                return None
             
-            # 获取算例信息
-            case_name = file_path.parent.name
+            # 读取数据
+            df = pd.read_csv(boundary_file)
             
-            return {
-                'case_name': case_name,
-                'file_path': str(file_path),
-                'original_shape': df.shape,
-                'te_shape': te_df.shape,
-                'minute_level_shape': minute_level_df.shape,
-                'gas_source_columns': t_columns,
-                'distribution_point_columns': e_columns,
-                'minute_level_data': minute_level_df,
-                'success': True
-            }
+            # 检查是否包含目标列
+            missing_columns = [col for col in self.target_columns if col not in df.columns]
+            if missing_columns:
+                print(f"Warning: Missing columns in {case_name}: {missing_columns}")
+            
+            # 提取目标列
+            available_columns = [col for col in self.target_columns if col in df.columns]
+            result_df = df[["TIME"] + available_columns].copy()
+            
+            # 转换时间列
+            result_df['TIME'] = pd.to_datetime(result_df['TIME'])
+            
+            # 添加时间索引（30分钟间隔）
+            result_df['time_index'] = range(len(result_df))
+            
+            # 添加算例信息
+            result_df['case_name'] = case_name
+            result_df['case_id'] = case_folder
+            
+            return result_df
             
         except Exception as e:
-            return {
-                'case_name': file_path.parent.name if file_path.parent else 'unknown',
-                'file_path': str(file_path),
-                'error': str(e),
-                'success': False
-            }
+            print(f"Error loading {case_name}: {str(e)}")
+            return None
     
-    def process_all_boundary_files(self) -> Dict[str, any]:
+    def process_all_cases(self, data_root: str, output_dir: str = None) -> Dict[str, pd.DataFrame]:
         """
-        处理所有Boundary.csv文件
+        处理所有算例的边界数据
         
+        Args:
+            data_root: 数据根目录
+            output_dir: 输出目录（可选）
+            
         Returns:
-            处理结果汇总
+            处理后的数据字典
         """
-        boundary_files = self.find_all_boundary_files()
+        if output_dir is None:
+            output_dir = Path(__file__).parent / "processed_boundary_data"
         
-        if not boundary_files:
-            return {
-                'success': False,
-                'message': f"未在 {self.data_root} 中找到任何Boundary.csv文件"
-            }
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True)
         
-        results = []
+        # 获取所有算例
+        all_cases = self.find_all_cases(data_root)
+        print(f"Found {len(all_cases)} cases to process")
+        
+        processed_data = {}
         successful_cases = []
         failed_cases = []
         
-        print(f"找到 {len(boundary_files)} 个Boundary.csv文件")
-        
-        for i, file_path in enumerate(boundary_files):
-            print(f"处理 {i+1}/{len(boundary_files)}: {file_path.parent.name}")
+        # 处理每个算例
+        for case_name in all_cases:
+            print(f"Processing {case_name}...")
             
-            result = self.process_single_boundary_file(file_path)
-            results.append(result)
-            
-            if result['success']:
-                successful_cases.append(result)
+            df = self.load_boundary_data(data_root, case_name)
+            if df is not None:
+                processed_data[case_name] = df
+                successful_cases.append(case_name)
+                
+                # 保存单独的CSV文件
+                output_file = output_path / f"{case_name}_boundary_data.csv"
+                df.to_csv(output_file, index=False)
+                
             else:
-                failed_cases.append(result)
-                print(f"  错误: {result['error']}")
+                failed_cases.append(case_name)
         
-        # 统计信息
+        # 保存处理摘要
         summary = {
-            'total_files': len(boundary_files),
-            'successful': len(successful_cases),
-            'failed': len(failed_cases),
-            'success_rate': len(successful_cases) / len(boundary_files) * 100,
-            'successful_cases': successful_cases,
-            'failed_cases': failed_cases,
-            'results': results
+            'total_cases': len(all_cases),
+            'successful_cases': len(successful_cases),
+            'failed_cases': len(failed_cases),
+            'target_columns': self.target_columns,
+            'gas_sources': self.gas_sources,
+            'distribution_points': self.distribution_points
         }
         
-        # 如果有成功处理的文件，分析列信息
-        if successful_cases:
-            first_success = successful_cases[0]
-            summary.update({
-                'gas_source_count': len(first_success['gas_source_columns']),
-                'distribution_point_count': len(first_success['distribution_point_columns']),
-                'sample_gas_sources': first_success['gas_source_columns'][:10],
-                'sample_distribution_points': first_success['distribution_point_columns'][:10]
-            })
-        
-        return summary
-    
-    def save_processed_data(self, output_dir: str, case_limit: Optional[int] = None):
-        """
-        保存处理后的数据
-        
-        Args:
-            output_dir: 输出目录
-            case_limit: 限制处理的案例数量（用于测试）
-        """
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-        
-        # 处理所有边界文件
-        summary = self.process_all_boundary_files()
-        
-        if not summary['successful_cases']:
-            print("没有成功处理的文件，无法保存数据")
-            return
-        
-        # 限制处理的案例数量
-        cases_to_process = summary['successful_cases']
-        if case_limit:
-            cases_to_process = cases_to_process[:case_limit]
-            print(f"限制处理案例数量为: {case_limit}")
-        
-        # 保存每个案例的处理后数据
-        for i, case_result in enumerate(cases_to_process):
-            case_name = case_result['case_name']
-            minute_data = case_result['minute_level_data']
-            
-            # 保存为CSV
-            output_file = output_path / f"{case_name}_TE_minute_level.csv"
-            minute_data.to_csv(output_file, index=False)
-            print(f"保存: {output_file}")
-        
-        # 保存处理汇总信息
         summary_file = output_path / "processing_summary.txt"
         with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write(f"边界数据处理汇总报告\n")
-            f.write(f"=" * 50 + "\n\n")
-            f.write(f"总文件数: {summary['total_files']}\n")
-            f.write(f"成功处理: {summary['successful']}\n")
-            f.write(f"处理失败: {summary['failed']}\n")
-            f.write(f"成功率: {summary['success_rate']:.1f}%\n\n")
+            f.write("边界数据处理摘要\n")
+            f.write("=" * 50 + "\n")
+            f.write(f"总算例数: {summary['total_cases']}\n")
+            f.write(f"成功处理: {summary['successful_cases']}\n")
+            f.write(f"处理失败: {summary['failed_cases']}\n")
+            f.write(f"\n目标气源: {', '.join(self.gas_sources)}\n")
+            f.write(f"目标分输点: {', '.join(self.distribution_points)}\n")
             
-            if 'gas_source_count' in summary:
-                f.write(f"气源(T系列)数量: {summary['gas_source_count']}\n")
-                f.write(f"分输点(E系列)数量: {summary['distribution_point_count']}\n\n")
-                
-                f.write("气源列示例:\n")
-                for col in summary['sample_gas_sources']:
-                    f.write(f"  {col}\n")
-                    
-                f.write("\n分输点列示例:\n")
-                for col in summary['sample_distribution_points']:
-                    f.write(f"  {col}\n")
-            
-            if summary['failed_cases']:
-                f.write(f"\n失败案例:\n")
-                for case in summary['failed_cases']:
-                    f.write(f"  {case['case_name']}: {case['error']}\n")
+            if failed_cases:
+                f.write(f"\n失败的算例:\n")
+                for case in failed_cases:
+                    f.write(f"- {case}\n")
         
-        print(f"\n处理汇总报告已保存到: {summary_file}")
-        print(f"成功处理 {len(cases_to_process)} 个案例的气源和分输点边界数据")
+        self.processed_data = processed_data
+        print(f"Processing completed. {len(successful_cases)}/{len(all_cases)} cases successful.")
+        print(f"Results saved to: {output_path}")
+        
+        return processed_data
+    
+    def get_statistics(self, data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        """
+        计算数据统计信息
+        
+        Args:
+            data: 处理后的数据字典
+            
+        Returns:
+            统计信息数据框
+        """
+        if not data:
+            return pd.DataFrame()
+        
+        stats_list = []
+        
+        for case_name, df in data.items():
+            case_stats = {
+                'case_name': case_name,
+                'data_points': len(df),
+                'time_span_hours': len(df) * 0.5,  # 30分钟间隔
+                'start_time': df['TIME'].min(),
+                'end_time': df['TIME'].max()
+            }
+            
+            # 每个列的统计信息
+            for col in self.target_columns:
+                if col in df.columns:
+                    case_stats[f"{col}_mean"] = df[col].mean()
+                    case_stats[f"{col}_std"] = df[col].std()
+                    case_stats[f"{col}_min"] = df[col].min()
+                    case_stats[f"{col}_max"] = df[col].max()
+                else:
+                    case_stats[f"{col}_mean"] = np.nan
+                    case_stats[f"{col}_std"] = np.nan
+                    case_stats[f"{col}_min"] = np.nan
+                    case_stats[f"{col}_max"] = np.nan
+            
+            stats_list.append(case_stats)
+        
+        return pd.DataFrame(stats_list)
 
 
 def main():
     """主函数"""
-    # 设置数据路径
-    data_root = "/home/chbds/zly/gaspipe/fluid_model/data/dataset"
-    output_dir = "/home/chbds/zly/gaspipe/fluid_model/semantic_data_ana/processed_te_data"
+    # 初始化处理器
+    processor = BoundaryDataProcessor()
     
-    # 创建处理器
-    processor = BoundaryDataProcessor(data_root)
+    # 数据根目录
+    data_root = "D:/ml_pro_master/chroes/fluid_model/data/dataset"
     
-    # 处理并保存数据（限制处理5个案例进行测试）
-    processor.save_processed_data(output_dir, case_limit=5)
+    # 输出目录
+    output_dir = "D:/ml_pro_master/chroes/fluid_model/semantic_data_ana/processed_boundary_data"
+    
+    # 处理所有数据
+    print("开始处理边界数据...")
+    processed_data = processor.process_all_cases(data_root, output_dir)
+    
+    # 计算统计信息
+    if processed_data:
+        print("计算统计信息...")
+        stats_df = processor.get_statistics(processed_data)
+        
+        # 保存统计信息
+        stats_file = Path(output_dir) / "statistics.csv"
+        stats_df.to_csv(stats_file, index=False)
+        print(f"统计信息已保存到: {stats_file}")
+        
+        # 打印基本信息
+        print(f"\n处理完成:")
+        print(f"- 成功处理 {len(processed_data)} 个算例")
+        print(f"- 目标变量: {len(processor.target_columns)} 个")
+        print(f"- 输出目录: {output_dir}")
 
 
 if __name__ == "__main__":

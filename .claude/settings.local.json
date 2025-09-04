@@ -31,7 +31,12 @@
       "Bash(tree:*)",
       "Bash(nvidia-smi:*)",
       "WebSearch",
-      "mcp__mcp-feedback-enhanced__interactive_feedback"
+      "mcp__mcp-feedback-enhanced__interactive_feedback",
+      "mcp__playwright__browser_snapshot",
+      "Bash(dir:*)",
+      "Read(./**)",
+      "Read(.\\**)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "ask": []
