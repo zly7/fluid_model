@@ -38,17 +38,17 @@ class NewBoundaryVisualizationApp:
         
         # 定义颜色配置
         self.gas_source_colors = {
-            'T_002:SNQ': '#FF6B6B',
-            'T_003:SNQ': '#4ECDC4', 
-            'T_004:SNQ': '#45B7D1'
+            'T_002:SNQ': '#FF0000',
+            'T_003:SNQ': '#00BFFF', 
+            'T_004:SNQ': '#1E90FF'
         }
         
         self.distribution_colors = {
-            'E_001:SNQ': '#96CEB4', 'E_002:SNQ': '#FECA57', 'E_003:SNQ': '#48CAE4',
-            'E_004:SNQ': '#FF9F43', 'E_005:SNQ': '#10AC84', 'E_006:SNQ': '#5F27CD',
-            'E_007:SNQ': '#00D2D3', 'E_008:SNQ': '#FF3838', 'E_009:SNQ': '#2E86AB',
-            'E_060:SNQ': '#A23B72', 'E_061:SNQ': '#F18F01', 'E_062:SNQ': '#C73E1D',
-            'E_109:SNQ': '#6BCF7F'
+            'E_001:SNQ': '#228B22', 'E_002:SNQ': '#FF8C00', 'E_003:SNQ': '#1E90FF',
+            'E_004:SNQ': '#FF4500', 'E_005:SNQ': '#00A86B', 'E_006:SNQ': '#8A2BE2',
+            'E_007:SNQ': '#00CED1', 'E_008:SNQ': '#DC143C', 'E_009:SNQ': '#191970',
+            'E_060:SNQ': '#8B0000', 'E_061:SNQ': '#FF6347', 'E_062:SNQ': '#B22222',
+            'E_109:SNQ': '#32CD32'
         }
     
     def get_available_cases(self) -> list:
@@ -257,7 +257,7 @@ def main():
     st.markdown("---")
     
     # 数据根目录
-    data_root = "D:/ml_pro_master/chroes/fluid_model/data/dataset"
+    data_root = "/home/chbds/zly/gaspipe/fluid_model/data/dataset"
     
     # 初始化应用
     if not Path(data_root).exists():
@@ -305,10 +305,12 @@ def main():
                 gas_cols = st.columns(len(gas_columns) if gas_columns else 1)
                 for i, col in enumerate(gas_columns):
                     with gas_cols[i % len(gas_cols)]:
-                        if st.button(f"{'✓' if st.session_state.gas_visibility.get(col, True) else '✗'} {col.split(':')[0]}", 
+                        current_state = st.session_state.gas_visibility.get(col, True)
+                        if st.button(f"{'✓' if current_state else '✗'} {col.split(':')[0]}", 
                                    key=f"gas_{col}", 
                                    help=f"点击切换 {col} 的显示状态"):
-                            st.session_state.gas_visibility[col] = not st.session_state.gas_visibility.get(col, True)
+                            st.session_state.gas_visibility[col] = not current_state
+                            st.rerun()
                 
                 selected_gas = [col for col in gas_columns if st.session_state.gas_visibility.get(col, True)]
                 
@@ -320,15 +322,22 @@ def main():
                 if 'dist_visibility' not in st.session_state:
                     st.session_state.dist_visibility = {col: i < 8 for i, col in enumerate(dist_columns)}  # 默认显示前8个
                 
+                # 确保所有当前分输点列都在session state中
+                for col in dist_columns:
+                    if col not in st.session_state.dist_visibility:
+                        st.session_state.dist_visibility[col] = False
+                
                 # 创建多列布局来放置按钮
                 num_cols = 3
                 dist_button_cols = st.columns(num_cols)
                 for i, col in enumerate(dist_columns):
                     with dist_button_cols[i % num_cols]:
-                        if st.button(f"{'✓' if st.session_state.dist_visibility.get(col, False) else '✗'} {col.split(':')[0]}", 
+                        current_visible = st.session_state.dist_visibility.get(col, False)
+                        if st.button(f"{'✓' if current_visible else '✗'} {col.split(':')[0]}", 
                                    key=f"dist_{col}",
                                    help=f"点击切换 {col} 的显示状态"):
-                            st.session_state.dist_visibility[col] = not st.session_state.dist_visibility.get(col, False)
+                            st.session_state.dist_visibility[col] = not current_visible
+                            st.rerun()
                 
                 selected_dist = [col for col in dist_columns if st.session_state.dist_visibility.get(col, False)]
                 
