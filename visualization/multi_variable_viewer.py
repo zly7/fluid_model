@@ -179,7 +179,7 @@ def load_dataset_data(dataset_name: str) -> Tuple[Optional[pd.DataFrame], Option
         st.error(f"Failed to load dataset {dataset_name}: {e}")
         return None, None
 
-def create_multi_variable_plot(variable_selections: List[Dict]) -> go.Figure:
+def create_multi_variable_plot(variable_selections: List[Dict], use_log_scale: bool = False) -> go.Figure:
     """Create multi-variable time series plot."""
     fig = go.Figure()
     
@@ -206,33 +206,71 @@ def create_multi_variable_plot(variable_selections: List[Dict]) -> go.Figure:
             
             # Add trace to the plot
             color = colors[color_idx % len(colors)]
-            fig.add_trace(
-                go.Scatter(
-                    x=data_source['TIME'] if 'TIME' in data_source.columns else data_source.index,
-                    y=data_source[selection['variable']],
-                    mode='lines',
-                    name=f"{selection['dataset']}: {selection['variable']}",
-                    line=dict(color=color, width=2),
-                    hovertemplate='<b>%{fullData.name}</b><br>' +
-                                'Time: %{x}<br>' +
-                                'Value: %{y:.4f}<br>' +
-                                '<extra></extra>'
+            
+            if use_log_scale:
+                # 处理负数的对数刻度：取绝对值的对数，保留符号
+                y_data = data_source[selection['variable']].copy()
+                y_log_data = []
+                for val in y_data:
+                    if pd.isna(val):
+                        y_log_data.append(val)
+                    elif val == 0:
+                        y_log_data.append(0)
+                    elif val > 0:
+                        y_log_data.append(np.log(val))
+                    else:  # val < 0
+                        y_log_data.append(-np.log(abs(val)))
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=data_source['TIME'] if 'TIME' in data_source.columns else data_source.index,
+                        y=y_log_data,
+                        mode='lines',
+                        name=f"{selection['dataset']}: {selection['variable']}",
+                        line=dict(color=color, width=2),
+                        hovertemplate='<b>%{fullData.name}</b><br>' +
+                                    'Time: %{x}<br>' +
+                                    'Original Value: %{customdata:.4f}<br>' +
+                                    'ln(|Value|): %{y:.4f}<br>' +
+                                    '<extra></extra>',
+                        customdata=data_source[selection['variable']]  # 保存原始数据用于hover显示
+                    )
                 )
-            )
+            else:
+                # 正常线性刻度
+                fig.add_trace(
+                    go.Scatter(
+                        x=data_source['TIME'] if 'TIME' in data_source.columns else data_source.index,
+                        y=data_source[selection['variable']],
+                        mode='lines',
+                        name=f"{selection['dataset']}: {selection['variable']}",
+                        line=dict(color=color, width=2),
+                        hovertemplate='<b>%{fullData.name}</b><br>' +
+                                    'Time: %{x}<br>' +
+                                    'Value: %{y:.4f}<br>' +
+                                    '<extra></extra>'
+                    )
+                )
             color_idx += 1
             
         except Exception as e:
             st.error(f"Error loading data for {selection['dataset']}.{selection['variable']}: {e}")
     
     # Update layout
+    title_text = "Multi-Variable Time Series Comparison"
+    yaxis_title = "Value"
+    if use_log_scale:
+        title_text += " (Log Scale)"
+        yaxis_title = "ln(|Value|) - Negative values use negative log"
+    
     fig.update_layout(
         title=dict(
-            text="Multi-Variable Time Series Comparison",
+            text=title_text,
             x=0.5,
             font=dict(size=20)
         ),
         xaxis_title="Time",
-        yaxis_title="Value",
+        yaxis_title=yaxis_title,
         height=600,
         showlegend=True,
         hovermode='x unified',
@@ -507,6 +545,14 @@ def run_multi_variable_viewer():
         placeholder="例如：p_in|p_out 或 ^B_ 或 .*temperature.*"
     )
     
+    # Add log scale option
+    st.sidebar.subheader("📊 显示选项")
+    use_log_scale = st.sidebar.checkbox(
+        "使用对数刻度 (ln)",
+        value=False,
+        help="使用自然对数刻度显示数据。负数将取绝对值的对数并保留负号。"
+    )
+    
     # Add new variable row button
     if st.sidebar.button("➕ 添加变量", key="add_variable"):
         st.session_state.variable_rows.append(str(uuid.uuid4()))
@@ -564,7 +610,7 @@ def run_multi_variable_viewer():
         
         # Create and display the plot
         try:
-            fig = create_multi_variable_plot(valid_selections)
+            fig = create_multi_variable_plot(valid_selections, use_log_scale)
             st.plotly_chart(fig, width='stretch')
             
             # Display statistics

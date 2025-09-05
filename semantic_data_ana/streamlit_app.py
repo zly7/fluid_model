@@ -64,9 +64,9 @@ class NewBoundaryVisualizationApp:
                 "description": "所有气源的SNQ数据",
                 "variables": []  # 将在运行时动态填充
             },
-            "方案4 - 核心分输点": {
-                "description": "核心分输点E_001到E_005",
-                "variables": ['E_001:SNQ', 'E_002:SNQ', 'E_003:SNQ', 'E_004:SNQ', 'E_005:SNQ']
+            "方案4 - 下部份分输管道": {
+                "description": "核心分输点E_069到E_073",
+                "variables": ['E_069:SNQ', 'E_070:SNQ', 'E_071:SNQ', 'E_072:SNQ', 'E_073:SNQ', "T_007:SNQ","B_080:FR","B_280:FR","B_277:FR","B_275:FR",'C_003:ST', 'C_003:SP_out']
             },
             "方案5 - 重要阀门": {
                 "description": "关键阀门B_240-B_245",
@@ -139,7 +139,7 @@ class NewBoundaryVisualizationApp:
         """
         return self.processor.load_boundary_data(str(self.data_root), case_name)
     
-    def create_line_plot(self, df: pd.DataFrame, selected_columns: list, case_name: str) -> go.Figure:
+    def create_line_plot(self, df: pd.DataFrame, selected_columns: list, case_name: str, use_log_scale: bool = False) -> go.Figure:
         """
         创建折线图
         
@@ -159,27 +159,61 @@ class NewBoundaryVisualizationApp:
                 color = self.get_variable_color(col)
                 display_name = self.get_variable_display_name(col)
                 
-                fig.add_trace(go.Scatter(
-                    x=df['time_index'],
-                    y=df[col],
-                    mode='lines+markers',
-                    name=display_name,
-                    line=dict(color=color, width=2),
-                    marker=dict(size=4),
-                    hovertemplate=f'<b>{col}</b><br>' +
-                                 '时间点: %{x}<br>' +
-                                 '数值: %{y:.4f}<extra></extra>'
-                ))
+                if use_log_scale:
+                    # 处理负数的对数刻度：取绝对值的对数，保留符号
+                    y_data = df[col].copy()
+                    y_log_data = []
+                    for val in y_data:
+                        if pd.isna(val):
+                            y_log_data.append(val)
+                        elif val == 0:
+                            y_log_data.append(0)
+                        elif val > 0:
+                            y_log_data.append(np.log(val))
+                        else:  # val < 0
+                            y_log_data.append(-np.log(abs(val)))
+                    
+                    fig.add_trace(go.Scatter(
+                        x=df['time_index'],
+                        y=y_log_data,
+                        mode='lines+markers',
+                        name=display_name,
+                        line=dict(color=color, width=2),
+                        marker=dict(size=4),
+                        hovertemplate=f'<b>{col}</b><br>' +
+                                     '时间点: %{x}<br>' +
+                                     '原始数值: %{customdata:.4f}<br>' ,
+                        customdata=df[col]  # 保存原始数据用于hover显示
+                    ))
+                else:
+                    # 正常线性刻度
+                    fig.add_trace(go.Scatter(
+                        x=df['time_index'],
+                        y=df[col],
+                        mode='lines+markers',
+                        name=display_name,
+                        line=dict(color=color, width=2),
+                        marker=dict(size=4),
+                        hovertemplate=f'<b>{col}</b><br>' +
+                                     '时间点: %{x}<br>' +
+                                     '数值: %{y:.4f}<extra></extra>'
+                    ))
         
         # 更新布局
+        title_text = f"{case_name} - 边界数据"
+        yaxis_title_text = "数值"
+        if use_log_scale:
+            title_text += " (对数刻度)"
+            yaxis_title_text = "ln(|数值|) - 负数取负对数"
+        
         fig.update_layout(
             title=dict(
-                text=f"{case_name} - 边界数据",
+                text=title_text,
                 x=0.5,
                 font=dict(size=16)
             ),
             xaxis_title="时间点 (30分钟间隔)",
-            yaxis_title="数值",
+            yaxis_title=yaxis_title_text,
             hovermode='x unified',
             template='plotly_white',
             height=600,
@@ -199,7 +233,7 @@ class NewBoundaryVisualizationApp:
         
         return fig
     
-    def create_comparison_plot(self, df: pd.DataFrame, selected_variables: dict, case_name: str) -> go.Figure:
+    def create_comparison_plot(self, df: pd.DataFrame, selected_variables: dict, case_name: str, use_log_scale: bool = False) -> go.Figure:
         """
         创建分类对比图
         
@@ -244,18 +278,48 @@ class NewBoundaryVisualizationApp:
             for var in variables:
                 if var in df.columns:
                     color = self.get_variable_color(var)
-                    fig.add_trace(go.Scatter(
-                        x=df['time_index'],
-                        y=df[var],
-                        mode='lines+markers',
-                        name=var,
-                        line=dict(color=color, width=2),
-                        marker=dict(size=4),
-                        showlegend=True,
-                        hovertemplate=f'<b>{var}</b><br>' +
-                                     '时间点: %{x}<br>' +
-                                     '数值: %{y:.4f}<extra></extra>'
-                    ), row=row, col=1)
+                    
+                    if use_log_scale:
+                        # 处理负数的对数刻度：取绝对值的对数，保留符号
+                        y_data = df[var].copy()
+                        y_log_data = []
+                        for val in y_data:
+                            if pd.isna(val):
+                                y_log_data.append(val)
+                            elif val == 0:
+                                y_log_data.append(0)
+                            elif val >= 0:
+                                y_log_data.append(np.log(val+1))
+                            else:  # val < 0
+                                y_log_data.append(-np.log(abs(val)+1))
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df['time_index'],
+                            y=y_log_data,
+                            mode='lines+markers',
+                            name=var,
+                            line=dict(color=color, width=2),
+                            marker=dict(size=4),
+                            showlegend=True,
+                            hovertemplate=f'<b>{var}</b><br>' +
+                                         '时间点: %{x}<br>' +
+                                         '原始数值: %{customdata:.4f}<br>',
+                            customdata=df[var]  # 保存原始数据用于hover显示
+                        ), row=row, col=1)
+                    else:
+                        # 正常线性刻度
+                        fig.add_trace(go.Scatter(
+                            x=df['time_index'],
+                            y=df[var],
+                            mode='lines+markers',
+                            name=var,
+                            line=dict(color=color, width=2),
+                            marker=dict(size=4),
+                            showlegend=True,
+                            hovertemplate=f'<b>{var}</b><br>' +
+                                         '时间点: %{x}<br>' +
+                                         '数值: %{y:.4f}<extra></extra>'
+                        ), row=row, col=1)
             row += 1
         
         # 更新布局
@@ -274,9 +338,10 @@ class NewBoundaryVisualizationApp:
         )
         
         # 更新坐标轴
+        yaxis_title = "ln(|数值|) - 负数取负对数" if use_log_scale else "数值"
         fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray', 
                         title_text="时间点 (30分钟间隔)", row=num_subplots, col=1)
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray', title_text="数值")
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray', title_text=yaxis_title)
         
         return fig
     
@@ -544,6 +609,13 @@ def main():
                     help="选择可视化类型"
                 )
                 
+                # 添加对数刻度切换按钮
+                use_log_scale = st.checkbox(
+                    "使用对数刻度 (ln)",
+                    value=False,
+                    help="使用自然对数刻度显示数据。负数将取绝对值的对数并保留负号。"
+                )
+                
                 show_stats = st.checkbox("显示统计信息", value=True)
                 
                 # 数据信息
@@ -610,12 +682,12 @@ def main():
             
             if viz_type == "统一折线图":
                 # 统一折线图
-                fig = app.create_line_plot(df, all_selected, selected_case)
+                fig = app.create_line_plot(df, all_selected, selected_case, use_log_scale)
                 st.plotly_chart(fig, width='stretch')
                 
             else:
                 # 分类对比图
-                fig = app.create_comparison_plot(df, selected_vars_by_category, selected_case)
+                fig = app.create_comparison_plot(df, selected_vars_by_category, selected_case, use_log_scale)
                 st.plotly_chart(fig, width='stretch')
             
             # 统计信息
