@@ -1,0 +1,20 @@
+{
+  "model_name": "FluidTCN",
+  "model_version": "1.0",
+  "input_dim": 6712,
+  "output_dim": 6712,
+  "sequence_length": 3,
+  "boundary_dims": 538,
+  "equipment_dims": 6174,
+  "num_channels": [128, 256, 256, 128],
+  "kernel_size": 3,
+  "dropout": 0.15,
+  "use_residual": true,
+  "use_norm": true,
+  "activation": "gelu",
+  "boundary_hidden_dim": 128,
+  "equipment_hidden_dim": 256,
+  "projection_hidden_dim": 256,
+  "learning_rate": 0.0008,
+  "weight_decay": 1e-05
+}

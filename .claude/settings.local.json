@@ -29,6 +29,7 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "Bash(tree:*)",
+      "mcp__mcp-server-firecrawl__firecrawl_search",
       "Bash(nvidia-smi:*)",
       "WebSearch",
       "mcp__mcp-feedback-enhanced__interactive_feedback",
