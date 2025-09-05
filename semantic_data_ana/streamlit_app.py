@@ -50,6 +50,34 @@ class NewBoundaryVisualizationApp:
             'E_060:SNQ': '#8B0000', 'E_061:SNQ': '#FF6347', 'E_062:SNQ': '#B22222',
             'E_109:SNQ': '#32CD32'
         }
+        
+        # 预定义的变量方案
+        self.predefined_schemes = {
+            "方案1 - 关键阀门+主气源+重点分输": {
+                "description": "N_138附近节点",
+                "variables": ['B_242:FR', 'B_243:FR', 'R_001:ST','R_001:SPD', 'T_003:SNQ', 'E_060:SNQ', 'E_061:SNQ', 'E_062:SNQ']
+            },
+            "方案2 - 主要气源组合": {
+                "description": "主要气源T_002、T_003和关键分输点E_109",
+                "variables": ['T_002:SNQ', 'T_003:SNQ', 'E_109:SNQ']
+            },
+            "方案3 - 全部气源": {
+                "description": "所有气源的SNQ数据",
+                "variables": ['T_002:SNQ', 'T_003:SNQ', 'T_004:SNQ']
+            },
+            "方案4 - 核心分输点": {
+                "description": "核心分输点E_001到E_005",
+                "variables": ['E_001:SNQ', 'E_002:SNQ', 'E_003:SNQ', 'E_004:SNQ', 'E_005:SNQ']
+            },
+            "方案5 - 高编号分输点": {
+                "description": "高编号分输点E_060、E_061、E_062、E_109",
+                "variables": ['E_060:SNQ', 'E_061:SNQ', 'E_062:SNQ', 'E_109:SNQ']
+            },
+            "方案6 - 混合监控": {
+                "description": "气源T_003和多个关键分输点",
+                "variables": ['T_003:SNQ', 'E_004:SNQ', 'E_008:SNQ', 'E_109:SNQ']
+            }
+        }
     
     def get_available_cases(self) -> list:
         """
@@ -243,6 +271,38 @@ class NewBoundaryVisualizationApp:
         stats['变化率(%)'] = ((stats['max'] - stats['min']) / stats['mean'] * 100).round(2)
         
         return stats
+    
+    def apply_predefined_scheme(self, scheme_name: str, df: pd.DataFrame):
+        """
+        应用预定义的变量方案
+        
+        Args:
+            scheme_name: 方案名称
+            df: 数据框
+            
+        Returns:
+            tuple: (selected_gas, selected_dist, scheme_variables)
+        """
+        if scheme_name not in self.predefined_schemes:
+            return [], [], []
+        
+        scheme_variables = self.predefined_schemes[scheme_name]['variables']
+        
+        # 分离气源和分输点变量
+        gas_variables = []
+        dist_variables = []
+        other_variables = []
+        
+        for var in scheme_variables:
+            if var in df.columns:
+                if var.startswith('T_') and ':SNQ' in var:
+                    gas_variables.append(var)
+                elif var.startswith('E_') and ':SNQ' in var:
+                    dist_variables.append(var)
+                else:
+                    other_variables.append(var)
+        
+        return gas_variables, dist_variables, other_variables
 
 
 def main():
@@ -291,6 +351,36 @@ def main():
             df = app.load_case_data(selected_case)
             
             if df is not None:
+                # 预定义方案选择
+                st.subheader("🎯 预定义方案")
+                
+                scheme_options = ["手动选择"] + list(app.predefined_schemes.keys())
+                selected_scheme = st.selectbox(
+                    "选择预设方案",
+                    scheme_options,
+                    help="选择预定义的变量组合方案，或选择'手动选择'自定义变量"
+                )
+                
+                # 显示方案描述
+                if selected_scheme != "手动选择":
+                    scheme_info = app.predefined_schemes[selected_scheme]
+                    st.info(f"**{selected_scheme}**\n\n{scheme_info['description']}\n\n变量: {', '.join(scheme_info['variables'])}")
+                    
+                    # 应用预定义方案
+                    scheme_gas, scheme_dist, scheme_others = app.apply_predefined_scheme(selected_scheme, df)
+                    
+                    # 初始化session state为方案变量
+                    if 'gas_visibility' not in st.session_state or st.button("应用方案", key="apply_scheme"):
+                        # 重置所有变量为False
+                        gas_columns = [col for col in app.processor.gas_sources if col in df.columns]
+                        dist_columns = [col for col in app.processor.distribution_points if col in df.columns]
+                        
+                        st.session_state.gas_visibility = {col: col in scheme_gas for col in gas_columns}
+                        st.session_state.dist_visibility = {col: col in scheme_dist for col in dist_columns}
+                        st.rerun()
+                
+                st.markdown("---")
+                
                 # 变量选择
                 st.subheader("🔧 变量选择")
                 

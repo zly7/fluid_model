@@ -41,7 +41,8 @@
       "Bash(claude mcp add playwright npx '@playwright/mcp@latest')",
       "Bash(claude mcp add:*)",
       "WebFetch(domain:localhost)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "mcp__playwright-linux__browser_navigate"
     ],
     "deny": [],
     "ask": []
