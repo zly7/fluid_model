@@ -19,18 +19,22 @@ class BoundaryDataProcessor:
     
     def __init__(self):
         """初始化处理器"""
-        # 定义气源变量列表
-        self.gas_sources = [
-            'T_002:SNQ', 'T_003:SNQ', 'T_004:SNQ'
-        ]
+        # 定义变量类型分类
+        self.variable_types = {
+            'gas_sources': {'prefix': 'T_', 'patterns': [':SNQ', ':SP']},
+            'distribution_points': {'prefix': 'E_', 'patterns': [':SNQ']},
+            'valves': {'prefix': 'B_', 'patterns': [':FR']},
+            'regulators': {'prefix': 'R_', 'patterns': [':ST', ':SPD']},
+            'compressors': {'prefix': 'C_', 'patterns': [':ST', ':SP_out']}
+        }
         
-        # 定义分输点变量列表 - 根据实际数据中找到的重要分输点
-        self.distribution_points = [
-            'E_001:SNQ', 'E_002:SNQ', 'E_003:SNQ', 'E_004:SNQ', 
-            'E_005:SNQ', 'E_006:SNQ', 'E_007:SNQ', 'E_008:SNQ', 
-            'E_009:SNQ', 'E_060:SNQ', 'E_061:SNQ', 'E_062:SNQ', 
-            'E_109:SNQ'
-        ]
+        # 这些列表将在load_boundary_data中动态生成
+        self.gas_sources = []
+        self.distribution_points = []
+        self.valves = []
+        self.regulators = []
+        self.compressors = []
+        self.all_variables = []
         
     def find_all_cases(self, data_root: str) -> list:
         """
@@ -88,20 +92,72 @@ class BoundaryDataProcessor:
             df['case_name'] = case_name
             df['case_id'] = case_name.split('/')[-1]
             
-            # 验证必要的列是否存在
-            missing_gas = [col for col in self.gas_sources if col not in df.columns]
-            missing_dist = [col for col in self.distribution_points if col not in df.columns]
-            
-            if missing_gas:
-                print(f"警告: 缺少气源列: {missing_gas}")
-            if missing_dist:
-                print(f"警告: 缺少分输点列: {missing_dist}")
+            # 动态发现变量
+            self._discover_variables(df)
             
             return df
             
         except Exception as e:
             print(f"加载边界数据时出错: {e}")
             return None
+    
+    def _discover_variables(self, df: pd.DataFrame):
+        """
+        动态发现数据框中的变量并按类型分类
+        
+        Args:
+            df: 数据框
+        """
+        # 重置变量列表
+        self.gas_sources = []
+        self.distribution_points = []
+        self.valves = []
+        self.regulators = []
+        self.compressors = []
+        self.all_variables = []
+        
+        # 获取所有列名（排除系统列）
+        system_columns = ['TIME', 'time_index', 'case_name', 'case_id']
+        data_columns = [col for col in df.columns if col not in system_columns]
+        
+        # 按类型分类变量
+        for col in data_columns:
+            if col.startswith('T_'):
+                self.gas_sources.append(col)
+            elif col.startswith('E_'):
+                self.distribution_points.append(col)
+            elif col.startswith('B_'):
+                self.valves.append(col)
+            elif col.startswith('R_'):
+                self.regulators.append(col)
+            elif col.startswith('C_'):
+                self.compressors.append(col)
+        
+        # 排序以保持一致性
+        self.gas_sources.sort()
+        self.distribution_points.sort()
+        self.valves.sort()
+        self.regulators.sort()
+        self.compressors.sort()
+        
+        # 创建全部变量列表
+        self.all_variables = (self.gas_sources + self.distribution_points + 
+                             self.valves + self.regulators + self.compressors)
+    
+    def get_variable_categories(self) -> dict:
+        """
+        获取所有变量类别
+        
+        Returns:
+            包含各类别变量的字典
+        """
+        return {
+            'gas_sources': self.gas_sources,
+            'distribution_points': self.distribution_points,
+            'valves': self.valves,
+            'regulators': self.regulators,
+            'compressors': self.compressors
+        }
     
     def get_available_variables(self, df: pd.DataFrame) -> dict:
         """
@@ -201,14 +257,14 @@ class BoundaryDataProcessor:
             validation['warnings'].append("缺少TIME列")
         
         # 检查数据类型
-        numeric_columns = self.gas_sources + self.distribution_points
+        numeric_columns = self.all_variables
         for col in numeric_columns:
             if col in df.columns:
                 if not pd.api.types.is_numeric_dtype(df[col]):
                     validation['warnings'].append(f"列 {col} 不是数值类型")
                 
                 # 检查负值（对于SNQ可能不合理）
-                if df[col].min() < 0:
+                if col.endswith(':SNQ') and df[col].min() < 0:
                     validation['warnings'].append(f"列 {col} 包含负值")
         
         # 检查缺失值
