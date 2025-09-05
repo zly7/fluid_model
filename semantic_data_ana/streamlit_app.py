@@ -68,15 +68,35 @@ class NewBoundaryVisualizationApp:
                 "description": "核心分输点E_069到E_073",
                 "variables": ['E_069:SNQ', 'E_070:SNQ', 'E_071:SNQ', 'E_072:SNQ', 'E_073:SNQ', "T_007:SNQ","B_080:FR","B_280:FR","B_277:FR","B_275:FR",'C_003:ST', 'C_003:SP_out']
             },
-            "方案5 - 重要阀门": {
+            "方案5 - 中部分分输管道": {
                 "description": "关键阀门B_240-B_245",
-                "variables": ['B_240:FR', 'B_241:FR', 'B_242:FR', 'B_243:FR', 'B_244:FR', 'B_245:FR']
+                "variables": ['E_115:SNQ', 'B_320:FR','B_321:FR','B_323:FR', 'B_302:FR', 'C_020:ST',"C_020:SP_out", 'C_021:ST',"C_021:SP_out",'C_022:ST',"C_022:SP_out",'C_023:ST',"C_023:SP_out",]
             },
-            "方案6 - 调节器监控": {
-                "description": "前5个调节器的状态和速度",
-                "variables": ['R_001:ST', 'R_001:SPD', 'R_002:ST', 'R_002:SPD', 'R_003:ST', 'R_003:SPD']
-            }
         }
+        
+    def apply_log_transform(self, data_series: pd.Series) -> list:
+        """
+        统一的对数变换函数，处理正数、负数和零值
+        
+        Args:
+            data_series: 需要变换的数据序列
+            
+        Returns:
+            变换后的数据列表
+        """
+        log_data = []
+        for val in data_series:
+            if pd.isna(val):
+                log_data.append(val)
+            elif val == 0:
+                log_data.append(0)
+            elif val > 0:
+                log_data.append(np.log(val + 1))
+            else:  # val < 0
+                log_data.append(-np.log(abs(val) + 1))
+        return log_data
+        
+        
     
     def get_variable_color(self, variable: str) -> str:
         """
@@ -160,18 +180,8 @@ class NewBoundaryVisualizationApp:
                 display_name = self.get_variable_display_name(col)
                 
                 if use_log_scale:
-                    # 处理负数的对数刻度：取绝对值的对数，保留符号
-                    y_data = df[col].copy()
-                    y_log_data = []
-                    for val in y_data:
-                        if pd.isna(val):
-                            y_log_data.append(val)
-                        elif val == 0:
-                            y_log_data.append(0)
-                        elif val > 0:
-                            y_log_data.append(np.log(val))
-                        else:  # val < 0
-                            y_log_data.append(-np.log(abs(val)))
+                    # 使用统一的对数变换函数
+                    y_log_data = self.apply_log_transform(df[col])
                     
                     fig.add_trace(go.Scatter(
                         x=df['time_index'],
@@ -204,7 +214,7 @@ class NewBoundaryVisualizationApp:
         yaxis_title_text = "数值"
         if use_log_scale:
             title_text += " (对数刻度)"
-            yaxis_title_text = "ln(|数值|) - 负数取负对数"
+            yaxis_title_text = "ln(|数值|+1) - 负数取负对数"
         
         fig.update_layout(
             title=dict(
@@ -280,18 +290,8 @@ class NewBoundaryVisualizationApp:
                     color = self.get_variable_color(var)
                     
                     if use_log_scale:
-                        # 处理负数的对数刻度：取绝对值的对数，保留符号
-                        y_data = df[var].copy()
-                        y_log_data = []
-                        for val in y_data:
-                            if pd.isna(val):
-                                y_log_data.append(val)
-                            elif val == 0:
-                                y_log_data.append(0)
-                            elif val >= 0:
-                                y_log_data.append(np.log(val+1))
-                            else:  # val < 0
-                                y_log_data.append(-np.log(abs(val)+1))
+                        # 使用统一的对数变换函数
+                        y_log_data = self.apply_log_transform(df[var])
                         
                         fig.add_trace(go.Scatter(
                             x=df['time_index'],
@@ -338,7 +338,7 @@ class NewBoundaryVisualizationApp:
         )
         
         # 更新坐标轴
-        yaxis_title = "ln(|数值|) - 负数取负对数" if use_log_scale else "数值"
+        yaxis_title = "ln(|数值|+1) - 负数取负对数" if use_log_scale else "数值"
         fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray', 
                         title_text="时间点 (30分钟间隔)", row=num_subplots, col=1)
         fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray', title_text=yaxis_title)
@@ -613,7 +613,7 @@ def main():
                 use_log_scale = st.checkbox(
                     "使用对数刻度 (ln)",
                     value=False,
-                    help="使用自然对数刻度显示数据。负数将取绝对值的对数并保留负号。"
+                    help="使用自然对数刻度显示数据：ln(|x|+1)。这样处理可以避免0值和1值附近的显示问题，负数将取绝对值加1的对数并保留负号。"
                 )
                 
                 show_stats = st.checkbox("显示统计信息", value=True)

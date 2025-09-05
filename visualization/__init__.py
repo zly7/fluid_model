@@ -5,7 +5,7 @@ from .plotly_charts import (
     plot_equipment_comparison,
     plot_boundary_conditions
 )
-from .streamlit_app import run_dashboard
+from .streamlit_app_training import run_dashboard
 from .multi_variable_viewer import run_multi_variable_viewer
 
 __all__ = [
