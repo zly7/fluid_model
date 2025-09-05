@@ -28,7 +28,8 @@
       "Bash(rm:*)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "mcp__mcp-server-firecrawl__firecrawl_search"
     ],
     "deny": [],
     "ask": []

@@ -151,6 +151,8 @@ def load_config_from_file(filepath: str) -> ModelConfig:
             model_type = 'cnn'
         elif 'lstm' in filename:
             model_type = 'lstm'
+        elif 'tcn' in filename:
+            model_type = 'tcn'
     
     if 'decoder' in model_type or model_type == 'fluiddecoder':
         return DecoderConfig.from_dict(config_dict)
@@ -159,6 +161,9 @@ def load_config_from_file(filepath: str) -> ModelConfig:
     elif 'lstm' in model_type or model_type == 'fluidlstm':
         from .lstm.config import LSTMConfig
         return LSTMConfig.from_dict(config_dict)
+    elif 'tcn' in model_type or model_type == 'fluidtcn':
+        from .tcn.config import TCNConfig
+        return TCNConfig.from_dict(config_dict)
     else:
         return ModelConfig.from_dict(config_dict)
 
