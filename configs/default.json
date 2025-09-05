@@ -16,7 +16,7 @@
   "device": "auto",
   "mixed_precision": true,
   "use_swanlab": false,
-  "wandb_project": "fluid-dynamics",
+  "swanlab_project": "fluid-dynamics",
   "seed": 42,
   "debug_mode": false
 }

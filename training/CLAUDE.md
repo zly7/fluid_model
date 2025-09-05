@@ -15,7 +15,7 @@
 
 ### 2. 训练配置和控制
 - **TrainingArguments** - 完整的训练参数配置
-- **实验跟踪** - WandB/TensorBoard 集成
+- **实验跟踪** - swanlab/TensorBoard 集成
 - **混合精度训练** - FP16 自动优化
 - **梯度裁剪和累积** - 稳定训练的关键技术
 

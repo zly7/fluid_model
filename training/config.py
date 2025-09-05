@@ -77,9 +77,9 @@ class TrainingConfig:
     
     # Weights & Biases integration
     use_swanlab: bool = False
-    wandb_project: Optional[str] = "fluid-dynamics"
-    wandb_entity: Optional[str] = None
-    wandb_run_name: Optional[str] = None
+    swanlab_project: Optional[str] = "fluid-dynamics"
+    swanlab_entity: Optional[str] = None
+    swanlab_run_name: Optional[str] = None
     
     def __post_init__(self):
         """Post-initialization validation and setup."""
@@ -112,8 +112,8 @@ class TrainingConfig:
             self.run_name = f"FluidDecoder_{model_size}_{timestamp}"
         
         # W&B setup
-        if self.wandb_run_name is None:
-            self.wandb_run_name = self.run_name
+        if self.swanlab_run_name is None:
+            self.swanlab_run_name = self.run_name
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
@@ -198,6 +198,9 @@ class TrainingConfig:
             'disable_tqdm': False,
             'remove_unused_columns': False,  # Important for our custom data format
         }
+        
+        # Device configuration is now handled earlier in setup_training_environment()
+        # to ensure CUDA_VISIBLE_DEVICES is set before PyTorch initialization
         
         # Only include warmup_steps if it's explicitly set (not None)
         if self.warmup_steps is not None:

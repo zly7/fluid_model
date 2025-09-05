@@ -29,8 +29,8 @@
   "pin_memory": true,
   "mixed_precision": true,
   "use_swanlab": true,
-  "wandb_project": "fluid-dynamics-production",
-  "wandb_entity": null,
+  "swanlab_project": "fluid-dynamics-production",
+  "swanlab_entity": null,
   "seed": 42,
   "debug_mode": false
 }

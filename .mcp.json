@@ -1,6 +1,6 @@
 {
 	"mcpServers": {
-		"context7": {
+		"context7-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
@@ -10,7 +10,15 @@
 				"@upstash/context7-mcp@latest"
 			]
 		},
-		"sequential-thinking": {
+		"context7-linux": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@upstash/context7-mcp@latest"
+			]
+		},
+		"sequential-thinking-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
@@ -20,7 +28,15 @@
 				"@modelcontextprotocol/server-sequential-thinking"
 			]
 		},
-		"mcp-feedback-enhanced": {
+		"sequential-thinking-linux": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-sequential-thinking"
+			]
+		},
+		"mcp-feedback-enhanced": { 
 			"type": "stdio",
 			"command": "uvx",
 			"args": [
@@ -31,12 +47,19 @@
 				"interactive_feedback"
 			]
 		},
-		"playwright": {
+		"playwright-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
 				"/c",
 				"npx",
+				"@playwright/mcp@latest"
+			]
+		},
+		"playwright-linux": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
 				"@playwright/mcp@latest"
 			]
 		},
@@ -48,7 +71,7 @@
 				"--local-timezone=Asia/Singapore"
 			]
 		},
-		"mcp-deepwiki": {
+		"mcp-deepwiki-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
@@ -58,7 +81,15 @@
 				"mcp-deepwiki@latest"
 			]
 		},
-		"mcp-server-firecrawl": {
+		"mcp-deepwiki-linux": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"mcp-deepwiki@latest"
+			]
+		},
+		"mcp-server-firecrawl-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
@@ -71,7 +102,18 @@
 				"FIRECRAWL_API_KEY": "fc-f83efd204f684fa898c878c66fb5df7e"
 			}
 		},
-		"task-master-ai": {
+		"mcp-server-firecrawl-linux": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"firecrawl-mcp"
+			],
+			"env": {
+				"FIRECRAWL_API_KEY": "fc-f83efd204f684fa898c878c66fb5df7e"
+			}
+		},
+		"task-master-ai-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
@@ -82,7 +124,11 @@
 				"task-master-ai"
 			]
 		},
-		"mcp-damengsql": {
+		"taskmaster-ai": {
+			"command": "npx",
+			"args": ["-y", "--package=task-master-ai", "task-master-ai"]
+		},
+		"mcp-damengsql-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
@@ -91,12 +137,27 @@
 				"D:/testwlhtea/run_mcp_server.py"
 			]
 		},
-		"desktop-commander": {
+		"mcp-damengsql-linux": {
+			"type": "stdio",
+			"command": "/path/to/your/project/testwlhtea/.venv/bin/python",
+			"args": [
+				"/path/to/your/project/testwlhtea/run_mcp_server.py"
+			]
+		},
+		"desktop-commander-win": {
 			"type": "stdio",
 			"command": "cmd",
 			"args": [
 				"/c",
 				"npx",
+				"-y",
+				"@wonderwhy-er/desktop-commander"
+			]
+		},
+		"desktop-commander-linux": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
 				"-y",
 				"@wonderwhy-er/desktop-commander"
 			]

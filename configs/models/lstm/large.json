@@ -7,15 +7,15 @@
   "hidden_dim": 768,
   "num_layers": 4,
   "bidirectional": true,
-  "dropout_rate": 0.1,
+  "dropout_rate": 0.2,
   "boundary_hidden_dim": 384,
   "equipment_hidden_dim": 768,
-  "projection_hidden_dim": 512,
+  "projection_hidden_dim": 1536,
   "batch_norm": true,
   "activation": "tanh",
   "use_attention": true,
   "attention_heads": 12,
   "use_layer_norm": true,
-  "recurrent_dropout": 0.1,
-  "weight_dropout": 0.1
+  "recurrent_dropout": 0.2,
+  "weight_dropout": 0.15
 }
